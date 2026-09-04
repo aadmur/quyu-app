@@ -1,0 +1,10 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 扫码框图标：四角取景框，线性 stroke 1.8 -->
+  <g stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M4 8 V5.5 C4 4.7, 4.7 4, 5.5 4 H8"/>
+    <path d="M16 4 H18.5 C19.3 4, 20 4.7, 20 5.5 V8"/>
+    <path d="M20 16 V18.5 C20 19.3, 19.3 20, 18.5 20 H16"/>
+    <path d="M8 20 H5.5 C4.7 20, 4 19.3, 4 18.5 V16"/>
+    <path d="M7 12 H17"/>
+  </g>
+</svg>

@@ -1,0 +1,11 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Story 双环渐变描边参考：#716a4b → #5e7a6e，供 CSS conic-gradient 参考 -->
+  <defs>
+    <linearGradient id="storyRing" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#716a4b"/>
+      <stop offset="100%" stop-color="#5e7a6e"/>
+    </linearGradient>
+  </defs>
+  <circle cx="12" cy="12" r="10" stroke="url(#storyRing)" stroke-width="2" fill="none"/>
+  <circle cx="12" cy="12" r="7" stroke="url(#storyRing)" stroke-width="1.5" fill="none" opacity="0.7"/>
+</svg>

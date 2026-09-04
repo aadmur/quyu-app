@@ -1,0 +1,11 @@
+<svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 趣渔 logo: 抽象侧视鱼 + 文字标，橄榄绿单色线性 -->
+  <g stroke="#716a4b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- 一笔弧线鱼身，尾鳍微翘 -->
+    <path d="M6 22 C12 12, 24 10, 32 17 C35 14, 38 11.5, 40 10 C39.5 14, 39.5 18, 40.5 22 C39.5 26, 39.5 30, 40 34 C38 32.5, 35 30, 32 27 C24 34, 12 32, 6 22 Z" fill="#716a4b" fill-opacity="0.08"/>
+    <path d="M6 22 C12 12, 24 10, 32 17 M32 27 C24 34, 12 32, 6 22"/>
+    <path d="M32 17 C35 14, 38 11.5, 40 10 C39.5 14, 39.5 18, 40.5 22 C39.5 26, 39.5 30, 40 34 C38 32.5, 35 30, 32 27"/>
+    <circle cx="12.5" cy="20" r="1.4" fill="#716a4b" stroke="none"/>
+  </g>
+  <text x="48" y="28" font-family="'PingFang SC','HarmonyOS Sans SC','Microsoft YaHei',sans-serif" font-size="22" font-weight="700" fill="#716a4b" letter-spacing="2">趣渔</text>
+</svg>

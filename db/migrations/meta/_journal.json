@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1788356206592,
+      "tag": "0000_remarkable_sasquatch",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1788405266092,
+      "tag": "0001_arch_v5",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1788430017622,
+      "tag": "0002_product_orders",
+      "breakpoints": true
+    }
+  ]
+}

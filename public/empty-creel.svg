@@ -1,0 +1,19 @@
+<svg width="200" height="160" viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 空鱼护线性插画：倒扣空鱼护 + 两根水草，ink-40 单色 -->
+  <g stroke="#2d1e1e" stroke-opacity="0.4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- 倒扣鱼护：梯形网兜 -->
+    <path d="M62 42 C62 36, 70 32, 100 32 C130 32, 138 36, 138 42 L126 118 C124 126, 112 130, 100 130 C88 130, 76 126, 74 118 Z"/>
+    <ellipse cx="100" cy="40" rx="38" ry="8"/>
+    <!-- 网眼 -->
+    <path d="M70 58 H130 M72 76 H128 M74 94 H126 M76 110 H124"/>
+    <path d="M84 48 L88 124 M100 48 L100 128 M116 48 L112 124"/>
+    <!-- 水草左 -->
+    <path d="M40 140 C36 118, 44 104, 38 88"/>
+    <path d="M40 140 C46 124, 40 112, 48 100"/>
+    <!-- 水草右 -->
+    <path d="M162 140 C166 120, 158 106, 164 92"/>
+    <path d="M162 140 C156 126, 162 114, 154 104"/>
+    <!-- 地面线 -->
+    <path d="M24 140 H176" stroke-dasharray="2 6"/>
+  </g>
+</svg>
