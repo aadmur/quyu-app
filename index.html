@@ -4,11 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- 数字字体自托管（public/fonts/，共 35KB），不再依赖境外字体 CDN。
+         离线可用、无跨域握手、无渲染阻塞外链；@font-face 定义见 src/index.css。 -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@400;500;600&display=swap"
-      rel="stylesheet"
+      rel="preload"
+      href="/fonts/oswald-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/bebas-neue-400.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
     />
     <title>趣渔 — 钓鱼人的朋友圈</title>
   </head>

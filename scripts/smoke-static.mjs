@@ -4,9 +4,35 @@
  * 用法：node --env-file=.env.smoke scripts/smoke-static.mjs
  */
 import { spawn } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 
 const PORT = process.env.PORT || "3100";
 const BASE = `http://127.0.0.1:${PORT}`;
+
+/** 从产物目录发现实际文件名，避免 hash 变化导致断言失效 */
+function discoverAssets() {
+  const assetDir = path.resolve("dist/public/assets");
+  const files = fs.readdirSync(assetDir).filter((f) => f.endsWith(".js") || f.endsWith(".css"));
+  const jsName = files
+    .filter((f) => f.endsWith(".js"))
+    .map((f) => ({ f, size: fs.statSync(path.join(assetDir, f)).size }))
+    .sort((a, b) => b.size - a.size)[0].f;
+  const cssName = files.filter((f) => f.endsWith(".css"))[0];
+  const variants = (name) => {
+    const raw = fs.statSync(path.join(assetDir, name)).size;
+    const br = fs.existsSync(path.join(assetDir, `${name}.br`))
+      ? fs.statSync(path.join(assetDir, `${name}.br`)).size
+      : null;
+    const gz = fs.existsSync(path.join(assetDir, `${name}.gz`))
+      ? fs.statSync(path.join(assetDir, `${name}.gz`)).size
+      : null;
+    return { raw, br, gz };
+  };
+  return { jsName, cssName, js: variants(jsName), css: variants(cssName) };
+}
+
+const ASSETS = discoverAssets();
 
 const child = spawn(
   process.execPath,
@@ -34,16 +60,23 @@ try {
   await sleep(3500);
 
   console.log("\n── 压缩协商 ──");
-  for (const [enc, expectLen] of [["br", 214587], ["gzip", 264454], ["identity", 943532]]) {
-    const res = await head("/assets/index-u0P2kqnp.js", { "Accept-Encoding": enc });
+  console.log(`     主 JS = ${ASSETS.jsName}  主 CSS = ${ASSETS.cssName}`);
+  const jsPath = `/assets/${ASSETS.jsName}`;
+  for (const [enc, expectLen] of [
+    ["br", ASSETS.js.br],
+    ["gzip", ASSETS.js.gz],
+    ["identity", ASSETS.js.raw],
+  ]) {
+    const res = await head(jsPath, { "Accept-Encoding": enc });
     check(`Accept-Encoding: ${enc} → content-encoding`, res.headers.get("content-encoding") || "identity", enc === "identity" ? "identity" : enc);
     check(`Accept-Encoding: ${enc} → content-length`, Number(res.headers.get("content-length")), expectLen);
   }
 
   console.log("\n── 缓存头 ──");
-  const css = await head("/assets/index-CpoC8fk_.css", { "Accept-Encoding": "br" });
+  const css = await head(`/assets/${ASSETS.cssName}`, { "Accept-Encoding": "br" });
   check("带 hash 的资源 → cache-control", css.headers.get("cache-control"), "public, max-age=31536000, immutable");
   check("带 hash 的资源 → Vary", css.headers.get("vary"), "Accept-Encoding");
+  check("CSS 压缩后体积", Number(css.headers.get("content-length")), ASSETS.css.br);
 
   const root = await head("/", { Accept: "text/html" });
   check("首页 / → status", root.status, 200);
@@ -65,12 +98,27 @@ try {
   const traversal = await head("/../../package.json");
   check("目录穿越被拒", traversal.status, (v) => v === 404 || v === 400);
 
+  console.log("\n── 自托管字体（QY-PERF-003）──");
+  for (const f of ["/fonts/oswald-latin.woff2", "/fonts/bebas-neue-400.woff2"]) {
+    const res = await head(f);
+    check(`${f} → 200 + woff2 MIME`, `${res.status}/${res.headers.get("content-type")}`, (v) =>
+      v.startsWith("200/") && v.includes("font/woff2"),
+    );
+  }
+
+  console.log("\n── 入口 HTML 无外链字体、含字体 preload ──");
+  const htmlRes = await head("/", { Accept: "text/html" });
+  const html = await htmlRes.text();
+  check("不含 googleapis/gstatic", /fonts\.(googleapis|gstatic)\.com/.test(html) ? "含外链" : "干净", "干净");
+  check("preload 自托管 Oswald", html.includes("/fonts/oswald-latin.woff2"), true);
+  check("preload 自托管 Bebas", html.includes("/fonts/bebas-neue-400.woff2"), true);
+
   console.log("\n── ETag / 304 协商 ──");
-  const first = await head("/assets/index-u0P2kqnp.js", { "Accept-Encoding": "br" });
+  const first = await head(jsPath, { "Accept-Encoding": "br" });
   const etag = first.headers.get("etag");
   check("响应含 ETag", Boolean(etag), true, etag ?? "");
   if (etag) {
-    const revalidated = await head("/assets/index-u0P2kqnp.js", { "Accept-Encoding": "br", "If-None-Match": etag });
+    const revalidated = await head(jsPath, { "Accept-Encoding": "br", "If-None-Match": etag });
     check("If-None-Match 命中 → 304", revalidated.status, 304);
     const revalidatedBody = await revalidated.text();
     check("304 无实体", revalidatedBody.length, 0);

@@ -97,10 +97,9 @@ export function serveStaticFiles(app: App) {
 
   // SPA 入口：显式注册 "/" 与 "/index.html"。
   // 不能用 app.use("*") 兜底——Hono 的 "*" 不匹配根路径 "/"，
-  // 会导致首页落到 notFound 分支（表现为 404 / 或走 HTML fallback 多读一次盘）。
+  // 会导致首页落到 notFound 分支。
   const serveIndex = async (c: AppContext) => {
     c.header("Cache-Control", "no-cache");
-    if (!fs.existsSync(indexPath)) return c.text("Not Found", 404);
     return serveFromDisk(c, indexPath, true);
   };
   app.get("/", serveIndex);
