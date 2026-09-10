@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Megaphone, Navigation, Star } from 'lucide-react'
 import { getPond } from '@/data/spots'
-import type { Seat, TicketType } from '@/data/spots'
+import type { PondReview, Seat, TicketType } from '@/data/spots'
 import PageHeader from '@/components/spots/PageHeader'
 import Gallery from '@/components/spots/Gallery'
 import SeatPicker from '@/components/spots/SeatPicker'
@@ -14,7 +14,8 @@ import DateSheet from '@/components/spots/DateSheet'
 import FishChip from '@/components/spots/FishChip'
 import { Toast, useToast } from '@/components/spots/Toast'
 import { trpc } from '@/providers/trpc'
-import { mapPondDetail } from '@/lib/live'
+import { mapPondDetail, relativeTime } from '@/lib/live'
+import { usePondMarks } from '@/hooks/usePondMarks'
 
 const infoStagger = (i: number) => ({
   initial: { opacity: 0, y: 16 },
@@ -29,27 +30,7 @@ function localDateKey(d: Date): string {
   return `${d.getFullYear()}-${m}-${day}`
 }
 
-/** 收藏 / 订阅鱼讯：localStorage 持久化（按 pond slug 存取） */
-const FAV_KEY = 'qy-fav-ponds'
-const SUB_KEY = 'qy-news-subs'
-function readSlugList(key: string): string[] {
-  try {
-    const raw = localStorage.getItem(key)
-    const arr = raw ? JSON.parse(raw) : []
-    return Array.isArray(arr) ? arr.filter((x): x is string => typeof x === 'string') : []
-  } catch {
-    return []
-  }
-}
-function toggleSlugInList(key: string, slug: string, on: boolean): void {
-  try {
-    const list = readSlugList(key)
-    const next = on ? [...new Set([...list, slug])] : list.filter((x) => x !== slug)
-    localStorage.setItem(key, JSON.stringify(next))
-  } catch {
-    /* 存储不可用时保持内存态 */
-  }
-}
+/** 收藏 / 订阅鱼讯：走后端 ponds.myMarks / ponds.toggleMark（见 hooks/usePondMarks） */
 
 /** 评分星：前 floor 颗实心 + 最后一颗按小数部分裁剪实心 */
 function RatingStars({ rating }: { rating: number }) {
@@ -72,6 +53,194 @@ function RatingStars({ rating }: { rating: number }) {
   )
 }
 
+/** 后端评价行（reviews 表 $inferSelect 的展示子集） */
+interface PondReviewItem {
+  id: number
+  authorName: string
+  authorAvatar: string
+  rating: number
+  content: string | null
+  tags: string[]
+  images: string[]
+  createdAt: string | Date
+}
+
+const REVIEW_PAGE_SIZE = 10
+
+/**
+ * 钓友评价区块（QY-B-002）：评分分布条（5~1 星占比）+ 分页评价卡片 + 加载更多。
+ * 数据走 trpc.app.ponds.reviews（{ slug, page, pageSize }）；接口未接线/请求失败时
+ * 回退详情接口自带的预览评价（ReviewList），保证页面始终可用。
+ */
+function PondReviewSection({
+  slug,
+  fallbackReviews,
+  fallbackTotal,
+}: {
+  slug: string
+  fallbackReviews: PondReview[]
+  fallbackTotal: number
+}) {
+  const [page, setPage] = useState(1)
+  const [items, setItems] = useState<PondReviewItem[]>([])
+  // 切换钓场时重置分页与累计列表
+  useEffect(() => {
+    setPage(1)
+    setItems([])
+  }, [slug])
+
+  const reviewsQuery = trpc.app.ponds.reviews.useQuery(
+    { slug, page, pageSize: REVIEW_PAGE_SIZE },
+    { enabled: !!slug, retry: 1 },
+  )
+  const data = reviewsQuery.data
+  // 分页累计：page 1 整体替换，后续页按 id 去重追加
+  useEffect(() => {
+    if (!data) return
+    setItems((prev) => {
+      if (page === 1) return data.items as PondReviewItem[]
+      const seen = new Set(prev.map((r) => r.id))
+      const more = (data.items as PondReviewItem[]).filter((r) => !seen.has(r.id))
+      return [...prev, ...more]
+    })
+  }, [data, page])
+
+  // 接口未就绪或失败：回退详情页预览评价
+  if (reviewsQuery.isError) {
+    return <ReviewList reviews={fallbackReviews} total={fallbackTotal} />
+  }
+
+  const stats = data?.stats
+
+  return (
+    <section className="mx-4 mb-6">
+      <h2 className="mb-2 text-[18px] font-semibold leading-6 text-ink">
+        钓友评价 {stats ? <span className="font-num text-[20px]">{stats.count}</span> : null}
+      </h2>
+
+      {/* 评分分布条（5~1 星横向占比） */}
+      {stats && stats.count > 0 && (
+        <div className="mb-3 flex items-center gap-4 rounded-xl border border-line bg-paper-white p-3.5">
+          <div className="flex shrink-0 flex-col items-center">
+            <span className="font-num text-[32px] leading-9 text-ink">{stats.avgRating.toFixed(1)}</span>
+            <RatingStars rating={stats.avgRating} />
+            <span className="mt-1 text-[12px] leading-4 text-ink-60">共 {stats.count} 条</span>
+          </div>
+          <div className="flex flex-1 flex-col gap-1.5">
+            {([5, 4, 3, 2, 1] as const).map((s, i) => {
+              const n = stats.dist[s] ?? 0
+              const pct = stats.count > 0 ? n / stats.count : 0
+              return (
+                <div key={s} className="flex items-center gap-2">
+                  <span className="flex w-8 shrink-0 items-center gap-0.5 text-[12px] leading-4 text-ink-60">
+                    {s}
+                    <Star size={10} strokeWidth={0} className="fill-olive text-olive" />
+                  </span>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-[#2d1e1e0d]">
+                    <motion.div
+                      initial={{ scaleX: 0 }}
+                      animate={{ scaleX: pct }}
+                      transition={{ delay: i * 0.06, duration: 0.5, ease: 'easeOut' }}
+                      style={{ transformOrigin: 'left' }}
+                      className="h-full rounded-full bg-olive"
+                    />
+                  </div>
+                  <span className="w-6 shrink-0 text-right font-num text-[12px] leading-4 text-ink-60">{n}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 首屏加载骨架 */}
+      {reviewsQuery.isLoading && (
+        <div className="flex flex-col gap-2.5">
+          {[0, 1].map((i) => (
+            <div key={i} className="h-24 animate-pulse rounded-xl bg-paper" />
+          ))}
+        </div>
+      )}
+
+      {/* 空态 */}
+      {data && stats?.count === 0 && (
+        <p className="rounded-xl border border-line bg-paper-white p-4 text-center text-[13px] leading-[18px] text-ink-60">
+          还没有评价，核销门票后第一个来评
+        </p>
+      )}
+
+      {/* 评价卡片列表 */}
+      <div className="flex flex-col gap-2.5">
+        {items.map((r) => (
+          <motion.div
+            key={r.id}
+            initial={{ opacity: 0, y: 12 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-10% 0px' }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
+            className="rounded-xl border border-line bg-paper-white p-3"
+          >
+            <div className="flex items-center gap-2">
+              <img src={r.authorAvatar} alt={r.authorName} className="h-8 w-8 rounded-full bg-paper object-cover" />
+              <span className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-[18px] text-ink">
+                {r.authorName}
+              </span>
+              <span className="flex shrink-0 gap-0.5">
+                {Array.from({ length: 5 }, (_, s) => (
+                  <Star
+                    key={s}
+                    size={13}
+                    strokeWidth={0}
+                    className={s < r.rating ? 'fill-olive text-olive' : 'fill-[#2d1e1e1f] text-[#2d1e1e1f]'}
+                  />
+                ))}
+              </span>
+            </div>
+            {(r.tags ?? []).length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {(r.tags ?? []).map((t) => (
+                  <span key={t} className="rounded-full bg-lake-tint px-2 py-0.5 text-[12px] leading-4 text-lake">
+                    {t}
+                  </span>
+                ))}
+              </div>
+            )}
+            {r.content && <p className="mt-2 text-[15px] leading-[22px] text-ink">{r.content}</p>}
+            {(r.images ?? []).length > 0 && (
+              <div className={`mt-2 grid gap-1.5 ${(r.images ?? []).length === 1 ? 'grid-cols-1' : 'grid-cols-3'}`}>
+                {(r.images ?? []).slice(0, 9).map((img, idx) => (
+                  <img
+                    key={idx}
+                    src={img}
+                    alt="评价晒图"
+                    loading="lazy"
+                    className={`rounded-lg bg-paper object-cover ${
+                      (r.images ?? []).length === 1 ? 'max-h-48 w-full' : 'aspect-square w-full'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+            <p className="mt-2 text-right text-[12px] leading-4 text-ink-40">{relativeTime(r.createdAt)}</p>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* 加载更多 */}
+      {data?.hasMore && (
+        <button
+          type="button"
+          disabled={reviewsQuery.isFetching}
+          onClick={() => setPage((p) => p + 1)}
+          className="mt-3 flex h-11 w-full items-center justify-center rounded-xl border border-line bg-paper-white text-[14px] font-semibold leading-5 text-olive disabled:opacity-60"
+        >
+          {reviewsQuery.isFetching ? '加载中…' : '加载更多'}
+        </button>
+      )}
+    </section>
+  )
+}
+
 /** 鱼塘详情页 /pond/:id：沉浸相册 + 鱼讯 + 介绍 + 在线选钓位 + 评价 + 票种 + 吸底购票栏 */
 export default function PondDetail() {
   const { id } = useParams()
@@ -90,14 +259,16 @@ export default function PondDetail() {
   }, [detailQuery.data, detailQuery.isLoading, id])
   const loading = detailQuery.isLoading
 
-  const [collected, setCollected] = useState(false)
-  const [subscribed, setSubscribed] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [seatNo, setSeatNo] = useState(0)
   const [ticketId, setTicketId] = useState('')
   const [shareOpen, setShareOpen] = useState(false)
   const [dateOpen, setDateOpen] = useState(false)
   const { message, show } = useToast()
+  // 收藏 / 订阅鱼讯：后端化标记（乐观更新 + 未登录弹登录层）
+  const { isFav, isSubscribed, toggleFav, toggleNews, loginSheet } = usePondMarks({ onToast: show })
+  const collected = pond ? isFav(pond.id) : false
+  const subscribed = pond ? isSubscribed(pond.id) : false
 
   // 数据就绪后初始化默认钓位与票种
   useEffect(() => {
@@ -105,13 +276,6 @@ export default function PondDetail() {
     setSeatNo((s) => (s ? s : pond.defaultSeat))
     setTicketId((t) => (t ? t : (pond.tickets[0]?.id ?? '')))
   }, [pond])
-
-  // 挂载时从 localStorage 还原收藏 / 订阅状态（按 pond slug）
-  useEffect(() => {
-    if (!pond) return
-    setCollected(readSlugList(FAV_KEY).includes(pond.id))
-    setSubscribed(readSlugList(SUB_KEY).includes(pond.id))
-  }, [pond?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 从钓点页「立即购票」进入时自动弹出选日期弹层
   useEffect(() => {
@@ -170,14 +334,7 @@ export default function PondDetail() {
         title={pond.name}
         collected={collected}
         onShare={() => setShareOpen(true)}
-        onCollect={() => {
-          setCollected((v) => {
-            const next = !v
-            toggleSlugInList(FAV_KEY, pond.id, next)
-            if (next) show('已收藏该钓点')
-            return next
-          })
-        }}
+        onCollect={() => toggleFav(pond.id)}
       />
 
       {/* Section 2 — 塘名信息区 */}
@@ -248,14 +405,7 @@ export default function PondDetail() {
           </div>
           <button
             type="button"
-            onClick={() => {
-              setSubscribed((v) => {
-                const next = !v
-                toggleSlugInList(SUB_KEY, pond.id, next)
-                if (next) show('已订阅该塘鱼讯')
-                return next
-              })
-            }}
+            onClick={() => toggleNews(pond.id)}
             className="shrink-0 text-[15px] font-semibold leading-[22px] text-lake"
           >
             {subscribed ? '已订阅 ✓' : '订阅鱼讯'}
@@ -286,8 +436,8 @@ export default function PondDetail() {
       {/* Section 5 — 在线选钓位 */}
       <SeatPicker seats={pond.seats} selected={seatNo} onSelect={onSelectSeat} />
 
-      {/* Section 6 — 钓友评价 */}
-      <ReviewList reviews={pond.reviews} total={pond.reviewCount} />
+      {/* Section 6 — 钓友评价（QY-B-002：评分分布条 + 分页列表，失败回退预览） */}
+      <PondReviewSection slug={pond.id} fallbackReviews={pond.reviews} fallbackTotal={pond.reviewCount} />
 
       {/* Section 7 — 票种列表 */}
       {ticket ? (
@@ -358,6 +508,7 @@ export default function PondDetail() {
         }}
       />
       <Toast message={message} />
+      {loginSheet}
     </div>
   )
 }

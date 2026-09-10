@@ -1,45 +1,25 @@
-import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Heart, Star } from 'lucide-react'
 import type { Pond } from '@/data/spots'
 import FishChip from './FishChip'
+import { Toast, useToast } from './Toast'
+import { usePondMarks } from '@/hooks/usePondMarks'
 
 interface PondCardProps {
   pond: Pond
   index: number
 }
 
-/** 收藏钓场 localStorage key（与 PondDetail 页共用：存 pond slug 数组） */
-const FAV_KEY = 'qy-fav-ponds'
-
-function readFavSlugs(): string[] {
-  try {
-    const raw = localStorage.getItem(FAV_KEY)
-    const arr: unknown = raw ? JSON.parse(raw) : []
-    return Array.isArray(arr) ? arr.filter((x): x is string => typeof x === 'string') : []
-  } catch {
-    return []
-  }
-}
-
-/** 钓场大卡：封面 3:2 + 距离胶囊 + 收藏（localStorage 持久化）+ 今日鱼讯横幅 + 信息区 + 立即购票 */
+/** 钓场大卡：封面 3:2 + 距离胶囊 + 收藏（后端化：ponds.myMarks / toggleMark）+ 今日鱼讯横幅 + 信息区 + 立即购票 */
 export default function PondCard({ pond, index }: PondCardProps) {
   const navigate = useNavigate()
-  const [fav, setFav] = useState(() => readFavSlugs().includes(pond.id))
-
-  const toggleFav = () => {
-    const slugs = readFavSlugs()
-    const next = slugs.includes(pond.id) ? slugs.filter((s) => s !== pond.id) : [...slugs, pond.id]
-    try {
-      localStorage.setItem(FAV_KEY, JSON.stringify(next))
-    } catch {
-      // 隐私模式等写入失败时仅保留内存态
-    }
-    setFav((v) => !v)
-  }
+  const { message, show } = useToast()
+  const { isFav, toggleFav, loginSheet } = usePondMarks({ onToast: show })
+  const fav = isFav(pond.id)
 
   return (
+    <>
     <motion.article
       layout
       initial={{ opacity: 0, y: 32 }}
@@ -71,7 +51,7 @@ export default function PondCard({ pond, index }: PondCardProps) {
           whileTap={{ scale: 0.85 }}
           onClick={(e) => {
             e.stopPropagation()
-            toggleFav()
+            toggleFav(pond.id)
           }}
           className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-ink/40 text-paper-white"
         >
@@ -125,5 +105,9 @@ export default function PondCard({ pond, index }: PondCardProps) {
         </div>
       </div>
     </motion.article>
+    {/* 收藏反馈 toast + 未登录引导层（fixed 定位，不影响卡片布局） */}
+    <Toast message={message} />
+    {loginSheet}
+    </>
   )
 }

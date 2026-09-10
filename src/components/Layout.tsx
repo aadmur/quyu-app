@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Home, MapPin, ShoppingBag, User, Plus, Signal, Wifi, BatteryFull } from 'lucide-react'
 import { isNativeApp } from '@/lib/safeArea'
+import UpdateSheet from './UpdateSheet'
 
 /** 模拟状态栏：44px，左「9:41」，右信号/WiFi/电池线性图标，融于页面背景 */
 export function StatusBar({ dark = false }: { dark?: boolean }) {
@@ -161,6 +162,8 @@ export default function Layout() {
         {showTabBar && <TabBar />}
       </div>
       <div className="hidden md:block flex-1" />
+      {/* APP 版本检查与更新提示（QY-G-003）：仅原生壳内可能弹出，浏览器静默 */}
+      <UpdateSheet />
     </div>
   )
 }

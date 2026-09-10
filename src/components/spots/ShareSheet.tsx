@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Link2, MessageCircle, Share2, Users } from 'lucide-react'
+import { Link2, Share2 } from 'lucide-react'
 
 interface ShareSheetProps {
   open: boolean
@@ -31,7 +31,7 @@ async function copyCurrentUrl(): Promise<boolean> {
   }
 }
 
-/** 分享面板：底部弹起（微信/朋友圈为 UI 演示；复制链接真实写入剪贴板；支持时提供系统分享） */
+/** 分享面板：底部弹起（系统分享 / 复制链接，均为真实能力） */
 export default function ShareSheet({ open, onClose, onAction }: ShareSheetProps) {
   const canSystemShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
 
@@ -53,8 +53,6 @@ export default function ShareSheet({ open, onClose, onAction }: ShareSheetProps)
           },
         ]
       : []),
-    { key: 'wechat', label: '微信', icon: MessageCircle, run: () => { onAction('已唤起模拟微信分享'); onClose() } },
-    { key: 'moments', label: '朋友圈', icon: Users, run: () => { onAction('已唤起模拟朋友圈分享'); onClose() } },
     {
       key: 'copy',
       label: '复制链接',

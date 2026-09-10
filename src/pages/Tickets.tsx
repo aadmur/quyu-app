@@ -12,18 +12,28 @@ import { useAuthGate } from '@/components/LoginSheet'
 
 const TABS: OrderStatus[] = ['pending', 'used', 'done']
 
-/** 订单卡：塘名/状态 + 票据信息 + 实付金额 + 状态操作（出示核销码 / 去评价 / 再来一单） */
+/** 订单卡：塘名/状态 + 票据信息 + 实付金额 + 状态操作（出示核销码 / 申请退款 / 去评价 / 再来一单） */
 function OrderCard({
   order,
   index,
   onShowCode,
+  refunded = false,
+  refunding = false,
+  onRefund,
 }: {
   order: Order
   index: number
   onShowCode: (o: Order) => void
+  /** 后端原始状态 refunded（mapMyOrder 将其并入 done，这里单独取「已退款」标签） */
+  refunded?: boolean
+  refunding?: boolean
+  onRefund: (o: Order) => void
 }) {
   const navigate = useNavigate()
-  const meta = STATUS_META[order.status]
+  // 已退款沿用状态徽章体系，样式复用 done 的灰底
+  const meta = refunded
+    ? { label: '已退款', badgeClass: 'bg-[#2d1e1e0d] text-ink-60' }
+    : STATUS_META[order.status]
 
   return (
     <motion.div
@@ -66,14 +76,26 @@ function OrderCard({
             实付 <span className="font-num text-[20px] leading-6 text-clay">¥{formatMoney(order.amount)}</span>
           </span>
           {order.status === 'pending' && (
-            <motion.button
-              type="button"
-              whileTap={{ scale: 0.96 }}
-              onClick={() => onShowCode(order)}
-              className="flex h-9 items-center rounded-xl bg-olive px-4 text-[13px] font-semibold leading-[18px] text-paper-white"
-            >
-              出示核销码
-            </motion.button>
+            <div className="flex items-center gap-2">
+              {/* 申请退款：次级样式，不抢「出示核销码」主按钮 */}
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.96 }}
+                disabled={refunding}
+                onClick={() => onRefund(order)}
+                className="flex h-9 items-center rounded-xl border border-line bg-paper-white px-4 text-[13px] leading-[18px] text-ink-60 disabled:opacity-50"
+              >
+                申请退款
+              </motion.button>
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.96 }}
+                onClick={() => onShowCode(order)}
+                className="flex h-9 items-center rounded-xl bg-olive px-4 text-[13px] font-semibold leading-[18px] text-paper-white"
+              >
+                出示核销码
+              </motion.button>
+            </div>
           )}
           {order.status === 'used' && (
             <motion.button
@@ -136,6 +158,7 @@ export default function Tickets() {
 
   const mineQuery = trpc.app.orders.mine.useQuery(undefined, { retry: 1 })
   const verifyMut = trpc.app.orders.verify.useMutation()
+  const refundMut = trpc.app.orders.refund.useMutation()
   const utils = trpc.useUtils()
   const { requireAuth, loginSheet } = useAuthGate()
   const live = !!mineQuery.data && !mineQuery.error
@@ -151,8 +174,35 @@ export default function Tickets() {
     () => (mineQuery.data ? mineQuery.data.map(mapMyOrder) : orderStore),
     [mineQuery.data],
   )
+  // 已退款订单 id 集合（mapMyOrder 把 refunded 并入 done，标签需按原始状态单独判定）
+  const refundedIds = useMemo(
+    () => new Set((mineQuery.data ?? []).filter((o) => o.status === 'refunded').map((o) => String(o.id))),
+    [mineQuery.data],
+  )
   const counts = TABS.map((s) => allOrders.filter((o) => o.status === s).length)
   const list = allOrders.filter((o) => o.status === tab)
+
+  /** 申请退款：确认后调 orders.refund；成功刷新列表，失败展示服务端 message */
+  const requestRefund = (order: Order) => {
+    if (!live) {
+      // 后端不可用（网络不可达）：无真实订单可退，文案明示
+      fireToast('演示模式暂不支持退款')
+      return
+    }
+    if (!window.confirm(`确认申请退款 ¥${formatMoney(order.amount)} 吗？`)) return
+    refundMut.mutate(
+      { orderId: Number(order.id) },
+      {
+        onSuccess: (r) => {
+          fireToast(`退款已受理，金额 ¥${formatMoney(Number(r.refundAmount))} 将原路退回（测试环境无真实扣款）`)
+          utils.app.orders.mine.invalidate()
+        },
+        onError: (e) => {
+          fireToast(e.message || '退款失败，请稍后再试')
+        },
+      },
+    )
+  }
 
   const simulateUse = (order: Order) => {
     const markUsedLocal = () => {
@@ -262,7 +312,15 @@ export default function Tickets() {
             <EmptyTickets />
           ) : (
             list.map((o, i) => (
-              <OrderCard key={o.id} order={o} index={i} onShowCode={setCodeOrder} />
+              <OrderCard
+                key={o.id}
+                order={o}
+                index={i}
+                onShowCode={setCodeOrder}
+                refunded={refundedIds.has(o.id)}
+                refunding={refundMut.isPending}
+                onRefund={requestRefund}
+              />
             ))
           )}
         </motion.div>

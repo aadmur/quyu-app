@@ -39,8 +39,8 @@ export default function FeedPost({ post, index, onCollect }: FeedPostProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const { toast, showToast } = useToast()
 
-  // 帖子链接：暂无详情页，真实帖子带 ?post= 参数，演示帖子退化为当前地址
-  const postUrl = postId != null ? `${window.location.origin}/?post=${postId}` : window.location.href
+  // 帖子链接：详情页路由 /post/<id>（演示帖子无 id，退化为当前地址）
+  const postUrl = postId != null ? `${window.location.origin}/post/${postId}` : window.location.href
 
   // 帖子曝光埋点：进入视口 50% 即上报 impression（仅真实数据帖子）
   useEffect(() => {
@@ -344,10 +344,10 @@ export default function FeedPost({ post, index, onCollect }: FeedPostProps) {
         </div>
       )}
 
-      {/* 7. 评论预览 */}
+      {/* 7. 评论预览：真实帖子进详情页，演示帖子开弹层 */}
       <button
         type="button"
-        onClick={() => setShowComments(true)}
+        onClick={() => (postId != null ? navigate(`/post/${postId}`) : setShowComments(true))}
         className="block w-full px-3 pt-1.5 text-left text-[13px] leading-[18px] text-ink-60"
       >
         查看全部 {post.commentCount} 条评论

@@ -16,17 +16,27 @@ import {
   X,
   LogIn,
   ImagePlus,
+  Heart,
+  Package,
+  Shield,
+  Store,
+  TriangleAlert,
 } from 'lucide-react'
 import FishIcon from '@/components/FishIcon'
 import Toast from '@/components/community/Toast'
 import { useToast } from '@/components/community/useToast'
 import CatchViewer from '@/components/community/CatchViewer'
 import ProfileInsightSheet from '@/components/community/ProfileInsightSheet'
-import { PROFILE, CATCH_WALL, CATCH_STATS } from '@/data/community'
+import { PROFILE } from '@/data/community'
+import type { CatchItem } from '@/data/community'
 import { trpc } from '@/providers/trpc'
-import LoginSheet, { goKimiLogin } from '@/components/LoginSheet'
+import LoginSheet from '@/components/LoginSheet'
+import ProductOrdersSheet from '@/components/shop/ProductOrdersSheet'
 
 const AVATAR_CHOICES = ['/avatar-1.png', '/avatar-2.png', '/avatar-3.png', '/avatar-4.png']
+
+// QY-E-004 内置封面（public/ 现有钓场风景图）
+const COVER_CHOICES = ['/pond-qinglong-1.jpg', '/pond-yunxi-1.jpg', '/pond-ludao-1.jpg']
 
 const EASE_OUT = [0.16, 1, 0.3, 1] as [number, number, number, number]
 
@@ -44,9 +54,11 @@ function CountUp({ value }: { value: number }) {
   return <>{display}</>
 }
 
-// 仅保留有真实页面的入口（我的收藏/优惠券目标页不存在，已隐藏）
+// 仅保留有真实页面的入口（优惠券目标页不存在，已隐藏；我的收藏已恢复 → /favorites；QY-D-002 塘主入驻 → /pond-apply）
 const SERVICE_ENTRIES = [
   { key: 'orders', label: '我的订单', icon: Receipt, path: '/tickets' },
+  { key: 'favorites', label: '我的收藏', icon: Heart, path: '/favorites' },
+  { key: 'pondApply', label: '塘主入驻', icon: Store, path: '/pond-apply' },
   { key: 'help', label: '帮助中心', icon: CircleHelp, path: null },
 ] as const
 
@@ -65,9 +77,17 @@ export default function Profile() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [loginOpen, setLoginOpen] = useState(false)
+  const [productOrdersOpen, setProductOrdersOpen] = useState(false)
   const [profile, setProfile] = useState<{ name: string; avatar: string } | null>(null)
   const [editName, setEditName] = useState(PROFILE.name)
   const [editAvatar, setEditAvatar] = useState(PROFILE.avatar)
+  const [editBio, setEditBio] = useState('')
+  // QY-E-004 封面：保存后本地立即生效的覆盖值 + 编辑态
+  const [coverOverride, setCoverOverride] = useState<string | null>(null)
+  const [editCover, setEditCover] = useState(PROFILE.cover)
+  // QY-E-005 注销账号：确认弹层 + 需输入「注销」二字才能提交
+  const [deletionOpen, setDeletionOpen] = useState(false)
+  const [deletionConfirmText, setDeletionConfirmText] = useState('')
 
   // 真实登录状态：auth.me 返回当前用户或 null（loading 中先显示骨架，避免闪烁）
   const utils = trpc.useUtils()
@@ -77,12 +97,71 @@ export default function Profile() {
   const displayName = profile?.name ?? me?.name ?? PROFILE.name
   const displayAvatar = profile?.avatar ?? me?.avatar ?? PROFILE.avatar
 
+  // 真实概览数据：发帖数 / 获赞 / 票券 / 等级 / 渔获墙 / 鱼种分布（未登录不请求，统计显示 0/空态）
+  const overviewQuery = trpc.app.users.overview.useQuery(undefined, { enabled: !!me, staleTime: 60_000 })
+  const overview = overviewQuery.data ?? null
+  const postCount = overview?.postCount ?? 0
+  const totalLikes = overview?.totalLikes ?? 0
+  const pendingTickets = overview?.pendingTickets ?? 0
+  const levelText = `钓友 LV${overview?.level ?? 1}`
+  const bioText = me?.bio ?? overview?.bio ?? '这个钓友很低调，还没有简介'
+  // 封面来源（QY-E-004）：本地保存覆盖值 → overview.cover（users.cover）→ 内置默认封面
+  const coverSrc = coverOverride ?? overview?.cover ?? PROFILE.cover
+
+  // 渔获墙真实数据 → CatchViewer 需要的 CatchItem 结构
+  const wallItems: CatchItem[] = (overview?.wall ?? []).map((w) => ({
+    id: String(w.id),
+    src: w.image,
+    multi: w.images.length > 1,
+    video: false,
+    likes: 0,
+    commentCount: 0,
+    caption: '我的渔获',
+    time: '',
+  }))
+  const speciesStats = overview?.speciesStats ?? []
+
+  // 商品订单横条徽章：进行中订单数（pending+paid+shipped，未登录显示 0）
+  const productOrdersQuery = trpc.app.products.mine.useQuery(undefined, { enabled: !!me, staleTime: 30_000 })
+  const activeProductOrders = (productOrdersQuery.data ?? []).filter(
+    (o) => o.status === 'pending' || o.status === 'paid' || o.status === 'shipped',
+  ).length
+
   const logoutMut = trpc.auth.logout.useMutation({
     onSuccess: async () => {
       setProfile(null)
       await utils.auth.me.invalidate()
+      await utils.app.users.overview.invalidate()
       showToast('已退出登录')
     },
+  })
+
+  // QY-E-005 注销状态：deletionRequestedAt 非空表示冷静期中；到期日 = 申请时间 + 7 天
+  const deletionRequestedAt = me?.deletionRequestedAt ? new Date(me.deletionRequestedAt) : null
+  const deletionDueDate = deletionRequestedAt
+    ? new Date(deletionRequestedAt.getTime() + 7 * 24 * 3600 * 1000)
+    : null
+  const deletionDueText = deletionDueDate
+    ? `${deletionDueDate.getMonth() + 1} 月 ${deletionDueDate.getDate()} 日`
+    : ''
+
+  const requestDeletionMut = trpc.auth.requestDeletion.useMutation({
+    onSuccess: async () => {
+      setDeletionOpen(false)
+      setDeletionConfirmText('')
+      setSettingsOpen(false)
+      await utils.auth.me.invalidate()
+      showToast('注销申请已提交，7 天冷静期内可随时撤销')
+    },
+    onError: (e) => showToast(e.message || '操作失败，请稍后再试'),
+  })
+
+  const cancelDeletionMut = trpc.auth.cancelDeletion.useMutation({
+    onSuccess: async () => {
+      await utils.auth.me.invalidate()
+      showToast('注销申请已撤销，账号恢复正常')
+    },
+    onError: (e) => showToast(e.message || '操作失败，请稍后再试'),
   })
 
   // 编辑资料：真实保存到后端 users 表（未登录先引导登录）
@@ -90,8 +169,10 @@ export default function Profile() {
     onSuccess: async (u) => {
       // 用后端返回的最新用户数据刷新本地态（自定义头像走 avatarData，vars.avatar 为 undefined）
       setProfile({ name: u.name ?? displayName, avatar: u.avatar ?? displayAvatar })
+      setCoverOverride(u.cover ?? null)
       setSettingsOpen(false)
       await utils.auth.me.invalidate()
+      await utils.app.users.overview.invalidate()
       showToast('资料已保存')
     },
     onError: (e) => showToast(e.message || '保存失败，请稍后再试'),
@@ -102,6 +183,8 @@ export default function Profile() {
     if (!me) { setLoginOpen(true); return }
     setEditName(displayName)
     setEditAvatar(displayAvatar)
+    setEditBio(me.bio ?? overview?.bio ?? '')
+    setEditCover(coverSrc)
     setSettingsOpen(true)
   }
 
@@ -130,13 +213,38 @@ export default function Profile() {
     reader.readAsDataURL(file)
   }
 
+  // 封面自定义（QY-E-004）：从相册/文件选择，等比压到最长边 1280、JPEG 0.8 读为 dataURL
+  const coverFileRef = useRef<HTMLInputElement>(null)
+  const pickCover = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const MAX_EDGE = 1280
+        const scale = Math.min(1, MAX_EDGE / Math.max(img.width, img.height))
+        canvas.width = Math.max(1, Math.round(img.width * scale))
+        canvas.height = Math.max(1, Math.round(img.height * scale))
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        setEditCover(canvas.toDataURL('image/jpeg', 0.8))
+      }
+      img.src = String(reader.result)
+    }
+    reader.readAsDataURL(file)
+  }
+
   const shareProfile = async () => {
     // 分享实际有效内容：真实用户名 + 最新渔获战报 + 直达链接
-    const latest = CATCH_WALL[0]
+    const latest = wallItems[0]
     const url = window.location.origin + '/me'
     const title = `${displayName}的趣渔主页`
     const text = [
-      `我是「${displayName}」，${PROFILE.level}，在趣渔累计渔获 ${PROFILE.stats.catches} 尾。`,
+      `我是「${displayName}」，${levelText}，在趣渔累计渔获 ${postCount} 尾。`,
       latest ? `最新战报：${latest.caption}` : '',
       `来看我的渔获墙：${url}`,
     ].filter(Boolean).join('\n')
@@ -156,12 +264,15 @@ export default function Profile() {
     }
   }
 
-  // 数据行仅保留有真实页面的入口（「关注」列表页不存在，已隐藏）
+  // 数据行：渔获 = 我的发帖数，获赞 = 帖子累计获赞，粉丝 = 真实关注数（v8.7.0 关注体系）
+  const followStatsQuery = trpc.app.users.followStats.useQuery(undefined, { enabled: !!me, staleTime: 60_000 })
+  const followers = followStatsQuery.data?.followers ?? 0
   const statsRow = [
-    { label: '渔获', value: PROFILE.stats.catches, onTap: () => setWallTab('grid') },
-    { label: '粉丝', value: PROFILE.stats.followers, onTap: () => setInsightOpen(true) },
+    { label: '渔获', value: postCount, onTap: () => setWallTab('grid') },
+    { label: '获赞', value: totalLikes, onTap: () => setWallTab('stats') },
+    { label: '粉丝', value: followers, onTap: () => navigate('/me/follows') },
   ]
-  const maxCount = Math.max(...CATCH_STATS.map((s) => s.count))
+  const maxCount = speciesStats.length ? Math.max(...speciesStats.map((s) => s.count)) : 1
 
   return (
     <div className="bg-paper pb-8">
@@ -169,7 +280,7 @@ export default function Profile() {
       <section className="relative">
         <div className="relative h-[140px] overflow-hidden">
           <motion.img
-            src={PROFILE.cover}
+            src={coverSrc}
             alt="个人封面"
             initial={{ scale: 1.08 }}
             animate={{ scale: 1 }}
@@ -226,7 +337,7 @@ export default function Profile() {
               )}
               <span className="flex items-center gap-1 rounded-full bg-lake-tint px-2.5 py-1 text-[12px] leading-4 text-lake">
                 <FishIcon size={14} className="text-lake" />
-                {PROFILE.level}
+                {levelText}
               </span>
               {!meLoading && (me ? (
                 <button
@@ -239,7 +350,7 @@ export default function Profile() {
               ) : (
                 <button
                   type="button"
-                  onClick={goKimiLogin}
+                  onClick={() => setLoginOpen(true)}
                   className="ml-auto flex items-center gap-1 rounded-full bg-olive px-3.5 py-1.5 text-[12px] font-semibold leading-4 text-paper-white active:brightness-95"
                 >
                   <LogIn size={13} /> 登录
@@ -250,7 +361,7 @@ export default function Profile() {
               variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
               className="mt-1 text-[13px] leading-[18px] text-ink-60"
             >
-              {PROFILE.bio}
+              {bioText}
             </motion.p>
             <motion.div
               variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
@@ -274,6 +385,29 @@ export default function Profile() {
           </motion.div>
         </div>
       </section>
+
+      {/* Section 1b — 注销冷静期状态条（QY-E-005）：仅冷静期内显示 */}
+      {deletionRequestedAt && (
+        <motion.section
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: 'easeOut' }}
+          className="mx-4 mt-4 flex items-center gap-3 rounded-2xl border border-[#e5484d33] bg-[#e5484d0d] px-4 py-3"
+        >
+          <TriangleAlert size={18} strokeWidth={1.8} className="shrink-0 text-[#e5484d]" />
+          <p className="flex-1 text-[13px] leading-[18px] text-ink">
+            账号注销中，将于 <span className="font-semibold text-[#e5484d]">{deletionDueText}</span> 永久注销
+          </p>
+          <button
+            type="button"
+            disabled={cancelDeletionMut.isPending}
+            onClick={() => cancelDeletionMut.mutate()}
+            className="shrink-0 rounded-full bg-paper-white px-3 py-1.5 text-[12px] font-semibold leading-4 text-ink active:bg-line disabled:opacity-60"
+          >
+            撤销注销
+          </button>
+        </motion.section>
+      )}
 
       {/* Section 2 — 身份切换胶囊（钓友 / 塘主） */}
       <section className="mx-4 mt-4">
@@ -332,7 +466,7 @@ export default function Profile() {
           <span className="text-[15px] font-semibold leading-[22px] text-ink">我的票券</span>
           <span className="flex items-center gap-1.5 text-[12px] leading-4 text-lake">
             <span className="h-1.5 w-1.5 rounded-full bg-lake" />
-            {PROFILE.pendingTickets} 张待使用
+            {pendingTickets} 张待使用
           </span>
           <span className="flex-1" />
           <span className="text-[12px] leading-4 text-ink-60">查看全部</span>
@@ -340,7 +474,60 @@ export default function Profile() {
         </motion.button>
       </motion.section>
 
-      {/* Section 3.5 — 我的兴趣画像（推荐算法可视化入口） */}
+      {/* Section 3b — 商品订单横条（打开 ProductOrdersSheet，进行中订单数徽章） */}
+      <motion.section
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, ease: 'easeOut', delay: 0.27 }}
+        className="mx-4 mt-3"
+      >
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.98 }}
+          onClick={() => setProductOrdersOpen(true)}
+          className="flex w-full items-center gap-3 rounded-2xl bg-paper-white px-4 py-3.5"
+        >
+          <span className="flex h-6 w-6 items-center justify-center text-olive">
+            <Package size={22} strokeWidth={1.8} />
+          </span>
+          <span className="text-[15px] font-semibold leading-[22px] text-ink">商品订单</span>
+          {activeProductOrders > 0 && (
+            <span className="flex items-center gap-1.5 text-[12px] leading-4 text-lake">
+              <span className="h-1.5 w-1.5 rounded-full bg-lake" />
+              {activeProductOrders} 单进行中
+            </span>
+          )}
+          <span className="flex-1" />
+          <span className="text-[12px] leading-4 text-ink-60">查看全部</span>
+          <ChevronRight size={18} strokeWidth={1.8} className="text-ink-40" />
+        </motion.button>
+      </motion.section>
+
+      {/* Section 3c — 内容审核入口（仅全局 admin 或已绑定塘主可见） */}
+      {me?.role === 'admin' && (
+        <motion.section
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: 'easeOut', delay: 0.275 }}
+          className="mx-4 mt-3"
+        >
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.98 }}
+            onClick={() => navigate('/moderation')}
+            className="flex w-full items-center gap-3 rounded-2xl bg-paper-white px-4 py-3.5"
+          >
+            <span className="flex h-6 w-6 items-center justify-center text-olive">
+              <Shield size={22} strokeWidth={1.8} />
+            </span>
+            <span className="text-[15px] font-semibold leading-[22px] text-ink">内容审核</span>
+            <span className="flex-1" />
+            <span className="text-[12px] leading-4 text-ink-60">举报队列</span>
+            <ChevronRight size={18} strokeWidth={1.8} className="text-ink-40" />
+          </motion.button>
+        </motion.section>
+      )}
+
       <motion.section
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -426,29 +613,43 @@ export default function Profile() {
               transition={{ duration: 0.2 }}
               className="grid grid-cols-3 gap-px bg-paper-white"
             >
-              {CATCH_WALL.map((item, i) => (
-                <motion.button
-                  key={item.id}
-                  type="button"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: i * 0.04, duration: 0.25, ease: 'easeOut' }}
-                  onClick={() => setViewerIndex(i)}
-                  className="relative aspect-square overflow-hidden bg-paper"
-                >
-                  <img src={item.src} alt={item.caption} loading="lazy" className="h-full w-full object-cover" />
-                  {item.multi && (
-                    <Layers size={16} strokeWidth={2} className="absolute right-1.5 top-1.5 text-white drop-shadow" />
-                  )}
-                  {item.video && (
-                    <span className="absolute inset-0 flex items-center justify-center">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-ink/40">
-                        <Play size={18} className="ml-0.5 fill-white text-white" />
+              {wallItems.length === 0 ? (
+                <div className="col-span-3 flex flex-col items-center gap-3 bg-paper-white px-4 py-12">
+                  <p className="text-[13px] leading-[18px] text-ink-60">还没有渔获，去发布第一条吧</p>
+                  <motion.button
+                    type="button"
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => navigate('/publish')}
+                    className="rounded-full bg-olive px-5 py-2 text-[13px] font-semibold leading-[18px] text-paper-white active:brightness-95"
+                  >
+                    去发布
+                  </motion.button>
+                </div>
+              ) : (
+                wallItems.map((item, i) => (
+                  <motion.button
+                    key={item.id}
+                    type="button"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: i * 0.04, duration: 0.25, ease: 'easeOut' }}
+                    onClick={() => setViewerIndex(i)}
+                    className="relative aspect-square overflow-hidden bg-paper"
+                  >
+                    <img src={item.src} alt={item.caption} loading="lazy" className="h-full w-full object-cover" />
+                    {item.multi && (
+                      <Layers size={16} strokeWidth={2} className="absolute right-1.5 top-1.5 text-white drop-shadow" />
+                    )}
+                    {item.video && (
+                      <span className="absolute inset-0 flex items-center justify-center">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-ink/40">
+                          <Play size={18} className="ml-0.5 fill-white text-white" />
+                        </span>
                       </span>
-                    </span>
-                  )}
-                </motion.button>
-              ))}
+                    )}
+                  </motion.button>
+                ))
+              )}
             </motion.div>
           ) : (
             /* 鱼获统计 Tab（演示彩蛋）：横向条形图，scaleX 0→1 stagger */
@@ -460,27 +661,31 @@ export default function Profile() {
               transition={{ duration: 0.2 }}
               className="bg-paper-white px-4 py-5"
             >
-              <p className="mb-4 text-[13px] leading-[18px] text-ink-60">累计鱼获 {PROFILE.stats.catches} 尾 · 按鱼种分布</p>
-              <div className="flex flex-col gap-4">
-                {CATCH_STATS.map((s, i) => (
-                  <div key={s.species} className="flex items-center gap-3">
-                    <span className="w-10 shrink-0 text-[13px] leading-[18px] text-ink">{s.species}</span>
-                    <div className="h-3 flex-1 overflow-hidden rounded-full bg-[#2d1e1e0d]">
-                      <motion.div
-                        initial={{ scaleX: 0 }}
-                        animate={{ scaleX: s.count / maxCount }}
-                        transition={{ delay: i * 0.08, duration: 0.5, ease: 'easeOut' }}
-                        style={{ transformOrigin: 'left' }}
-                        className="h-full rounded-full bg-olive"
-                      />
+              <p className="mb-4 text-[13px] leading-[18px] text-ink-60">累计鱼获 {postCount} 尾 · 按鱼种分布</p>
+              {speciesStats.length === 0 ? (
+                <p className="py-6 text-center text-[13px] leading-[18px] text-ink-60">还没有鱼种数据，发布渔获后自动统计</p>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {speciesStats.map((s, i) => (
+                    <div key={s.species} className="flex items-center gap-3">
+                      <span className="w-10 shrink-0 text-[13px] leading-[18px] text-ink">{s.species}</span>
+                      <div className="h-3 flex-1 overflow-hidden rounded-full bg-[#2d1e1e0d]">
+                        <motion.div
+                          initial={{ scaleX: 0 }}
+                          animate={{ scaleX: s.count / maxCount }}
+                          transition={{ delay: i * 0.08, duration: 0.5, ease: 'easeOut' }}
+                          style={{ transformOrigin: 'left' }}
+                          className="h-full rounded-full bg-olive"
+                        />
+                      </div>
+                      <span className="w-12 shrink-0 text-right font-num text-[20px] leading-6 text-ink">
+                        {s.count}
+                        <span className="ml-0.5 font-sans text-[12px] leading-4 text-ink-60">尾</span>
+                      </span>
                     </div>
-                    <span className="w-12 shrink-0 text-right font-num text-[20px] leading-6 text-ink">
-                      {s.count}
-                      <span className="ml-0.5 font-sans text-[12px] leading-4 text-ink-60">尾</span>
-                    </span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -488,11 +693,14 @@ export default function Profile() {
 
       {/* Section 6 — 页脚 */}
       <footer className="pb-8 pt-8 text-center text-[12px] leading-4 text-ink-40">
-        趣渔 MVP 演示版 · v0.1.0
+        趣渔 · v8.7.0
       </footer>
 
       {/* 渔获全屏浏览 */}
-      <CatchViewer items={CATCH_WALL} index={viewerIndex} onChange={setViewerIndex} onClose={() => setViewerIndex(null)} />
+      <CatchViewer items={wallItems} index={viewerIndex} onChange={setViewerIndex} onClose={() => setViewerIndex(null)} />
+
+      {/* 商品订单弹层 */}
+      <ProductOrdersSheet open={productOrdersOpen} onClose={() => setProductOrdersOpen(false)} />
 
       {/* 我的兴趣画像弹层 */}
       <AnimatePresence>
@@ -555,20 +763,138 @@ export default function Profile() {
                   onChange={pickAvatar}
                 />
               </div>
+              {/* QY-E-004 更换封面：预览 + 内置 3 张 + 相册上传（弹层仅登录后可打开） */}
+              <p className="mb-2 text-[13px] text-ink-60">封面</p>
+              <div className="mb-5">
+                <div className="mb-2 h-20 w-full overflow-hidden rounded-xl border border-line bg-paper-white">
+                  <img src={editCover} alt="封面预览" className="h-full w-full object-cover" />
+                </div>
+                <div className="flex items-center gap-2">
+                  {COVER_CHOICES.map((c) => (
+                    <button
+                      key={c} type="button" onClick={() => setEditCover(c)}
+                      className={`h-12 w-20 shrink-0 overflow-hidden rounded-lg border-2 ${editCover === c ? 'border-olive' : 'border-transparent'}`}
+                    >
+                      <img src={c} alt="内置封面" className="h-full w-full object-cover" />
+                    </button>
+                  ))}
+                  <button
+                    type="button" onClick={() => coverFileRef.current?.click()}
+                    className={`flex h-12 w-20 shrink-0 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg border-2 border-dashed ${editCover.startsWith('data:') ? 'border-olive' : 'border-line'} bg-paper-white text-ink-40`}
+                  >
+                    {editCover.startsWith('data:') ? (
+                      <img src={editCover} alt="自定义封面" className="h-full w-full object-cover" />
+                    ) : (
+                      <>
+                        <ImagePlus size={16} />
+                        <span className="text-[10px] leading-3">相册上传</span>
+                      </>
+                    )}
+                  </button>
+                  <input
+                    ref={coverFileRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={pickCover}
+                  />
+                </div>
+              </div>
               <p className="mb-2 text-[13px] text-ink-60">昵称</p>
               <input
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
                 maxLength={24}
-                className="mb-6 h-12 w-full rounded-xl bg-paper-white px-3 text-[15px] text-ink outline-none"
+                className="mb-4 h-12 w-full rounded-xl bg-paper-white px-3 text-[15px] text-ink outline-none"
+              />
+              <p className="mb-2 text-[13px] text-ink-60">简介</p>
+              <textarea
+                value={editBio}
+                onChange={(e) => setEditBio(e.target.value)}
+                maxLength={200}
+                rows={3}
+                placeholder="一句话介绍自己，最多 200 字"
+                className="mb-6 w-full resize-none rounded-xl bg-paper-white px-3 py-3 text-[15px] leading-[22px] text-ink outline-none"
               />
               <button
                 type="button"
                 disabled={updateMut.isPending || !editName.trim()}
-                onClick={() => updateMut.mutate({ name: editName.trim(), avatar: editAvatar.startsWith('data:') ? undefined : editAvatar, avatarData: editAvatar.startsWith('data:') ? editAvatar : undefined })}
+                onClick={() => updateMut.mutate({ name: editName.trim(), avatar: editAvatar.startsWith('data:') ? undefined : editAvatar, avatarData: editAvatar.startsWith('data:') ? editAvatar : undefined, bio: editBio.trim(), cover: editCover.startsWith('data:') ? undefined : editCover, coverData: editCover.startsWith('data:') ? editCover : undefined })}
                 className="flex h-12 w-full items-center justify-center rounded-full bg-olive text-[15px] font-semibold text-paper-white disabled:opacity-60"
               >
                 {updateMut.isPending ? <Loader2 size={18} className="animate-spin" /> : '保存'}
+              </button>
+              {/* QY-E-005 注销账号入口：弱化样式（红色小号文字），冷静期内不重复展示 */}
+              {!deletionRequestedAt && (
+                <button
+                  type="button"
+                  onClick={() => { setDeletionConfirmText(''); setDeletionOpen(true) }}
+                  className="mt-4 w-full text-center text-[12px] leading-4 text-[#e5484d]/80 active:text-[#e5484d]"
+                >
+                  注销账号
+                </button>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* QY-E-005 注销账号确认弹层：说明后果，需输入「注销」二字确认 */}
+      <AnimatePresence>
+        {deletionOpen && (
+          <>
+            <motion.button
+              type="button" aria-label="关闭注销确认"
+              className="fixed inset-0 z-[60] bg-ink/35"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setDeletionOpen(false)}
+            />
+            <motion.div
+              role="dialog" aria-label="注销账号确认"
+              className="fixed inset-x-0 bottom-0 z-[70] mx-auto max-w-md rounded-t-[20px] bg-paper px-5 pt-3"
+              style={{ paddingBottom: 'max(var(--safe-bottom, 0px), 40px)' }}
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 320 }}
+            >
+              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-line" />
+              <header className="mb-4 flex items-center justify-between">
+                <h2 className="text-[17px] font-semibold text-[#e5484d]">注销账号</h2>
+                <button type="button" aria-label="关闭" onClick={() => setDeletionOpen(false)} className="text-ink-40">
+                  <X size={20} />
+                </button>
+              </header>
+              <div className="mb-5 space-y-2.5 text-[13px] leading-[19px] text-ink-80">
+                <p>注销申请提交后将进入 <span className="font-semibold text-ink">7 天冷静期</span>，期间账号可正常使用，重新登录或点击「撤销注销」即可取消。</p>
+                <p>冷静期结束后账号将被永久注销，<span className="font-semibold text-ink">不可恢复</span>：</p>
+                <ul className="list-disc space-y-1.5 pl-5 text-ink-60">
+                  <li>昵称将显示为「已注销用户」，头像、简介、封面、邮箱等个人资料被清空，无法再登录。</li>
+                  <li>你发布的帖子和评论会保留，但作者显示为「已注销用户」。</li>
+                  <li>门票与商品订单流水按平台对账要求保留。</li>
+                  <li>关注关系和钓场收藏将被删除。</li>
+                </ul>
+              </div>
+              <p className="mb-2 text-[13px] text-ink-60">请输入「注销」以确认操作</p>
+              <input
+                value={deletionConfirmText}
+                onChange={(e) => setDeletionConfirmText(e.target.value)}
+                maxLength={8}
+                placeholder="注销"
+                className="mb-4 h-12 w-full rounded-xl bg-paper-white px-3 text-[15px] text-ink outline-none"
+              />
+              <button
+                type="button"
+                disabled={requestDeletionMut.isPending || deletionConfirmText.trim() !== '注销'}
+                onClick={() => requestDeletionMut.mutate()}
+                className="flex h-12 w-full items-center justify-center rounded-full bg-[#e5484d] text-[15px] font-semibold text-paper-white disabled:opacity-40"
+              >
+                {requestDeletionMut.isPending ? <Loader2 size={18} className="animate-spin" /> : '确认注销'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeletionOpen(false)}
+                className="mt-3 w-full text-center text-[13px] leading-[18px] text-ink-60"
+              >
+                再想想
               </button>
             </motion.div>
           </>

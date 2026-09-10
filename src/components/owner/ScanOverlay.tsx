@@ -1,6 +1,6 @@
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X } from 'lucide-react'
+import { X, Keyboard } from 'lucide-react'
 
 /** 扫描线（隔离的 perpetual 动画微组件） */
 const ScanLine = memo(function ScanLine() {
@@ -16,29 +16,14 @@ const ScanLine = memo(function ScanLine() {
 
 interface ScanOverlayProps {
   open: boolean
-  /** 模拟识别成功（按钮点击 1s 后触发） */
-  onDetected: () => void
+  /** 切到手动输码（真实核销入口） */
+  onSwitchToManual: () => void
   onClose: () => void
 }
 
-/** 全屏模拟扫码：黑底 + 240×240 取景框 + lake 扫描线往复 + 模拟识别按钮 */
-export default function ScanOverlay({ open, onDetected, onClose }: ScanOverlayProps) {
-  const [recognizing, setRecognizing] = useState(false)
-  const timer = useRef<number | undefined>(undefined)
-
-  useEffect(() => {
-    if (!open) {
-      setRecognizing(false)
-      window.clearTimeout(timer.current)
-    }
-  }, [open])
-
-  const simulate = () => {
-    if (recognizing) return
-    setRecognizing(true)
-    timer.current = window.setTimeout(onDetected, 1000)
-  }
-
+/** 全屏扫码取景层：黑底 + 240×240 取景框 + 扫描线。
+ *  诚实版：http 部署/无相机权限环境下不做假识别，引导到手动输码（真实核销链路）。 */
+export default function ScanOverlay({ open, onSwitchToManual, onClose }: ScanOverlayProps) {
   const corners = [
     'left-0 top-0 border-l-[3px] border-t-[3px] rounded-tl-lg',
     'right-0 top-0 border-r-[3px] border-t-[3px] rounded-tr-lg',
@@ -77,35 +62,20 @@ export default function ScanOverlay({ open, onDetected, onClose }: ScanOverlayPr
               <div className="absolute inset-0 overflow-hidden rounded-lg">
                 <ScanLine />
               </div>
-              {/* 模拟识别中：显示钓友票二维码 */}
-              <AnimatePresence>
-                {recognizing && (
-                  <motion.img
-                    src="/qr-demo.svg"
-                    alt="识别到钓友票券二维码"
-                    className="absolute inset-6 rounded-md"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.25 }}
-                  />
-                )}
-              </AnimatePresence>
             </div>
           </div>
 
-          <p className="mt-6 text-[13px] leading-[18px] text-paper-white/60">
-            {recognizing ? '识别中…' : '对准钓友票券上的二维码'}
+          <p className="mt-6 px-10 text-center text-[13px] leading-[18px] text-paper-white/60">
+            当前部署环境未启用相机能力（HTTP 站点/Android WebView 限制）。请让钓友出示 6 位核销码，使用手动输码完成真实核销。
           </p>
 
           <motion.button
             type="button"
             whileTap={{ scale: 0.96 }}
-            onClick={simulate}
-            disabled={recognizing}
-            className="mt-auto mb-16 h-12 rounded-full border border-paper-white/40 px-6 text-[15px] leading-none text-paper-white disabled:opacity-50"
+            onClick={onSwitchToManual}
+            className="mt-auto mb-16 flex h-12 items-center gap-2 rounded-full bg-lake px-6 text-[15px] font-semibold leading-none text-paper-white"
           >
-            {recognizing ? '识别中…' : '模拟：扫到钓友的票'}
+            <Keyboard size={18} strokeWidth={1.8} /> 手动输入核销码
           </motion.button>
         </motion.div>
       )}

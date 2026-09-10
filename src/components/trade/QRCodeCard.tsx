@@ -71,14 +71,14 @@ export default function QRCodeCard({ order, used, onSimulateUse }: QRCodeCardPro
       {/* 底部细节 */}
       <p className="mt-3 text-center text-[12px] leading-4 text-ink-40">亮度已自动调高</p>
 
-      {/* 演示入口：模拟塘主核销 */}
+      {/* 塘主核销入口（真实调用 orders.verify，需塘主权限） */}
       {!used && onSimulateUse && (
         <button
           type="button"
           onClick={onSimulateUse}
           className="mx-auto mt-2 block text-[12px] leading-4 text-ink-40 underline underline-offset-2"
         >
-          模拟塘主核销（演示）
+          塘主核销此票
         </button>
       )}
     </div>

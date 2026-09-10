@@ -55,7 +55,7 @@ export default function CommentSheet({ comments, total, postId, onClose }: Comme
             utils.app.posts.comments.invalidate({ postId })
             utils.app.feed.invalidate()
           },
-          onError: () => showToast('评论发送失败'),
+          onError: (e) => showToast(e.message || '评论发送失败'),
         },
       )
     }
