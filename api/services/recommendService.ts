@@ -8,10 +8,11 @@
  * - 多级缓存：recall:hot 候选池（60s）、feed 结果页（30s）、profile（60s，见 profileService）
  * - tracking.user_event 消费者：批量 INSERT user_events + 累加 impression_count + 异步更新画像
  */
-import { inArray, sql } from "drizzle-orm";
+import { and, desc, gt, inArray, isNull, sql } from "drizzle-orm";
 import { posts } from "@db/schema";
 import { getAnalytics, getCache, getDataSource, getQueue, timedRead, type DomainEvent } from "../infra";
 import { getProfile, updateProfileBatch, type Profile, type ProfileDelta } from "./profileService";
+import { followeeIds } from "./social";
 
 // ---- 权重（抖音式多目标融合，可调参） ----
 const W = {
@@ -25,6 +26,14 @@ const W = {
 const RECALL_LIMIT = 200;
 const RECALL_TTL = 60;
 const FEED_TTL = 30;
+const FOLLOWEES_TTL = 60;
+/** QY-COMM-008：关注作者在打分阶段提权倍数 */
+const FOLLOW_BOOST = 1.5;
+
+/** 我关注的作者 id 集（60s 缓存；关注/取关最长 60s 反映到推荐加权，可接受） */
+async function getFolloweeIds(userId: number): Promise<number[]> {
+  return getCache().getOrSet(`followees:${userId}`, FOLLOWEES_TTL, () => followeeIds(userId));
+}
 
 /** 时效分：24h 半衰期指数衰减 */
 function freshnessScore(createdAt: Date): number {
@@ -32,10 +41,14 @@ function freshnessScore(createdAt: Date): number {
   return Math.pow(0.5, ageHours / 24);
 }
 
-/** 互动率（点赞+评论相对曝光的强度） */
+/** 互动率（点赞+评论相对曝光的强度）；封顶 1——率值超过 1 无业务意义，
+ *  否则种子/刷量数据会以数千分淹没一切新帖 */
 function engagementScores(post: { likeCount: number; commentCount: number; impressions: number }) {
   const imp = Math.max(post.impressions, 1);
-  return { likeRate: post.likeCount / imp, commentRate: post.commentCount / imp };
+  return {
+    likeRate: Math.min(post.likeCount / imp, 1),
+    commentRate: Math.min(post.commentCount / imp, 1),
+  };
 }
 
 /** 画像匹配分：帖子的鱼种/钓场与用户偏好的加权和 */
@@ -57,8 +70,10 @@ async function recallCandidates(): Promise<PostRow[]> {
       db
         .select()
         .from(posts)
-        .where(sql`${posts.createdAt} > ${since}`)
-        .orderBy(sql`${posts.createdAt} DESC`)
+        // 原生写法：.limit() 内联数字、gt() 走列类型序列化，
+        // 避免 sql`` 模板里 LIMIT ? 占位符在 MySQL 预处理下报错（线上 feed 挂掉的根因）
+        .where(and(gt(posts.createdAt, since), isNull(posts.deletedAt))) // 过滤软删帖（v8.7.0）
+        .orderBy(desc(posts.createdAt))
         .limit(RECALL_LIMIT),
     );
   });
@@ -91,6 +106,7 @@ export async function recommendFeed(userId: number, page: number, pageSize = 5) 
   }
 
   const rows = await recallCandidates();
+  const followeeSet = new Set(await getFolloweeIds(userId)); // 关注作者提权（QY-COMM-008）
 
   // 粗排 + 精排打分
   const scored: Scored[] = rows.map((post, i) => {
@@ -102,12 +118,13 @@ export async function recommendFeed(userId: number, page: number, pageSize = 5) 
     const fresh = freshnessScore(post.createdAt);
     const prof = profileScore({ fishSpecies: post.fishSpecies, pondSlug: post.pondSlug }, profile);
     const explore = ((Math.sin(seed + i * 997) + 1) / 2) * 0.5; // 确定性伪随机
-    const score =
+    let score =
       W.likeRate * eng.likeRate * 10 +
       W.commentRate * eng.commentRate * 10 +
       W.freshness * fresh +
       W.profile * prof +
       W.explore * explore;
+    if (post.authorId != null && followeeSet.has(post.authorId)) score *= FOLLOW_BOOST; // 关注作者提权
     return { post, score };
   });
 
@@ -121,6 +138,20 @@ export async function recommendFeed(userId: number, page: number, pageSize = 5) 
     const idx = result.findIndex((p) => p.score < adjusted.score);
     if (idx === -1) result.push(adjusted);
     else result.splice(idx, 0, adjusted);
+  }
+
+  // 作者视角即时反馈：自己 48h 内发布的新帖置顶（按时间倒序），
+  // 解决"刚发的帖子沉底看不到"的体验问题（对齐 ins 的作者优先曝光）
+  const nowMs = Date.now();
+  const ownFresh = result.filter(
+    (r) => r.post.authorId === userId && nowMs - new Date(r.post.createdAt).getTime() < 48 * 3_600_000,
+  );
+  if (ownFresh.length > 0) {
+    const ownIds = new Set(ownFresh.map((r) => r.post.id));
+    const rest = result.filter((r) => !ownIds.has(r.post.id));
+    ownFresh.sort((a, b) => +new Date(b.post.createdAt) - +new Date(a.post.createdAt));
+    result.length = 0;
+    result.push(...ownFresh, ...rest);
   }
 
   const start = (page - 1) * pageSize;
@@ -140,6 +171,35 @@ export async function recommendFeed(userId: number, page: number, pageSize = 5) 
   await enqueueImpressions(userId, payload.items);
 
   return { ...payload, profile };
+}
+
+/**
+ * 关注动态流（QY-COMM-008）：只取我关注作者的非删除帖，created_at 倒序分页。
+ * 返回结构与 recommendFeed 的 { items, hasMore } 兼容（items 为 posts 全字段行 + pondSlug/score，
+ * 前端复用同一个 mapFeedPost）；未关注任何人 → 直接返回空，不打库。
+ * limit pageSize+1 判定 hasMore。
+ */
+export async function followingFeed(userId: number, page: number, pageSize = 5): Promise<FeedPayload> {
+  const ids = await getFolloweeIds(userId);
+  if (ids.length === 0) return { items: [], hasMore: false };
+  const rows = await timedRead("posts.following_feed", (db) =>
+    db
+      .select()
+      .from(posts)
+      .where(and(inArray(posts.authorId, ids), isNull(posts.deletedAt)))
+      .orderBy(desc(posts.createdAt))
+      .offset((page - 1) * pageSize)
+      .limit(pageSize + 1),
+  );
+  const hasMore = rows.length > pageSize;
+  const items: FeedItem[] = rows.slice(0, pageSize).map((post) => ({
+    ...post,
+    pondSlug: post.pondSlug,
+    score: 0, // 时间流无打分，占位保持 FeedItem 契约
+  }));
+  // 曝光事件：与推荐流同口径异步入队（画像 impression 会略偏，可接受）
+  await enqueueImpressions(userId, items);
+  return { items, hasMore };
 }
 
 async function enqueueImpressions(userId: number, items: Array<{ id: number }>) {

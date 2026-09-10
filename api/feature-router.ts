@@ -9,13 +9,19 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createRouter, rateLimit, tracedPublic } from "./middleware";
-import { toggleLike, addComment, listComments, listNews, createPost } from "./services/community";
-import { listPonds, getPondDetail, publishNews } from "./services/pond";
-import { createOrder, myOrders, verifyOrder, reviewOrder } from "./services/trade";
-import { ownerStats } from "./services/ownerService";
-import { listProducts, searchProducts, createProductOrder, myProductOrders } from "./services/shop";
-import { recommendFeed, trackEvent } from "./services/recommendService";
-import { getProfile, updateUserProfile } from "./services/profileService";
+import { toggleLike, addComment, listComments, listNews, createPost, getPost, deletePost, editPost, searchPosts, getShareCard } from "./services/community";
+import { toggleFollow, followState, followStats, followersList, followingList } from "./services/social";
+import { reportPost, listReports, handleReport } from "./services/moderation";
+import { submitApplication, myApplication, listPendingApplications, reviewApplication, pendingApplicationCount } from "./services/pondApplication";
+import { listPonds, getPondDetail, publishNews, toggleMark, myMarks, myFavoritePonds, listPondReviews } from "./services/pond";
+import { createOrder, myOrders, refundOrder, reviewOrder } from "./services/trade";
+import { listNotifications, unreadCount, markAllRead } from "./services/notify";
+import { ownerStatsScoped, ownerWeekly, verifyOrderScoped } from "./services/ownerService";
+import { claimPond, myPonds, type OwnerUser } from "./services/ownerBinding";
+import { listProducts, searchProducts, createProductOrder, myProductOrders, refundProductOrder, confirmProductOrder, advanceProductOrder } from "./services/shop";
+import { recommendFeed, followingFeed, trackEvent } from "./services/recommendService";
+import { getProfile, updateUserProfile, getProfileOverview } from "./services/profileService";
+import { getVersionInfo } from "./services/appVersion";
 
 /**
  * MVP 演示用户：未登录时以 userId=1 体验完整链路。
@@ -42,6 +48,16 @@ function ipKey(ctx: { ip?: string }) {
   return `ip:${ctx.ip ?? "unknown"}`;
 }
 
+/** 塘主门禁（v8.6.0 多钓场绑定）：全局 admin 或 pond_admins 有任何绑定的塘主。
+ *  返回规范化 OwnerUser 供下游作用域过滤；不满足抛 403。 */
+async function requireManager(ctx: { user?: { id: number; role: string } | null }): Promise<OwnerUser> {
+  if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+  const user: OwnerUser = { id: ctx.user.id, role: ctx.user.role };
+  if (user.role === "admin") return user;
+  if ((await myPonds(user)).length > 0) return user;
+  throw new TRPCError({ code: "FORBIDDEN", message: "仅限钓场审核员或已绑定塘主" });
+}
+
 export const featureRouter = createRouter({
   // ============ 推荐信息流（抖音式算法） ============
   feed: tracedPublic
@@ -62,6 +78,14 @@ export const featureRouter = createRouter({
   profileInsight: tracedPublic.query(async ({ ctx }) => {
     const p = await getProfile(uid(ctx));
     return p ?? { fishPrefs: {}, pondPrefs: {} };
+  }),
+
+  // ============ APP 版本检查（QY-G-003） ============
+  // APK 壳版本信息：{ latestApkVersion, apkUrl, notes, force }。
+  // 数据源：APP_VERSION_FILE JSON 文件（mtime 热更）→ env 兜底 → latestApkVersion: null。
+  // 纯增量公共接口，未配置时前端不打扰；读取失败 fail-open，不影响其他接口。
+  versionInfo: tracedPublic.query(async () => {
+    return getVersionInfo();
   }),
 
   // ============ 钓场 ============
@@ -88,14 +112,57 @@ export const featureRouter = createRouter({
     news: tracedPublic.query(async () => {
       return listNews();
     }),
-    // 塘主发布鱼讯（需登录 + admin 审核员）；pondSlug 必传（前端传真实选中钓场）
+    // 钓场评价列表（v8.8.0）：分页 + 评分分布聚合
+    reviews: tracedPublic
+      .input(z.object({ slug: z.string(), page: z.number().int().min(1).default(1), pageSize: z.number().int().min(1).max(50).default(10) }))
+      .query(async ({ input }) => {
+        return listPondReviews(input.slug, input.page, input.pageSize);
+      }),
+    // 塘主发布鱼讯：全局 admin 可发任意钓场；绑定塘主仅可发自己绑定的钓场
     publishNews: tracedPublic
       .input(z.object({ pondSlug: z.string().min(1).max(64), content: z.string().min(1).max(255) }))
       .mutation(async ({ ctx, input }) => {
-        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "仅钓场审核员可发布鱼讯" });
-        return publishNews(input.pondSlug, input.content);
+        const user = await requireManager(ctx);
+        if (user.role !== "admin") {
+          const owned = await myPonds(user);
+          if (!owned.some((p) => p.slug === input.pondSlug)) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "只能给自己绑定的钓场发布鱼讯" });
+          }
+        }
+        return publishNews(input.pondSlug, input.content, user.id);
       }),
+    // 收藏 / 订阅鱼讯切换（匿名走演示用户兜底，与 posts.like 同口径）
+    toggleMark: tracedPublic
+      .use(rateLimit({ capacity: 30, refillPerSec: 30 / 60, key: actorKey }))
+      .input(z.object({ pondSlug: z.string(), kind: z.enum(["fav", "news"]) }))
+      .mutation(async ({ ctx, input }) => {
+        return toggleMark(uid(ctx), input.pondSlug, input.kind);
+      }),
+    // 我的收藏/订阅 slug 集合：{ fav: string[], news: string[] }
+    myMarks: tracedPublic.query(async ({ ctx }) => {
+      return myMarks(uid(ctx));
+    }),
+    // 我收藏的钓场完整列表（按收藏时间倒序）
+    myFavorites: tracedPublic.query(async ({ ctx }) => {
+      return myFavoritePonds(uid(ctx));
+    }),
+  }),
+
+  // ============ 消息中心（点赞/评论/核销通知） ============
+  notify: createRouter({
+    // 通知列表（近 50 条倒序）
+    list: tracedPublic.query(async ({ ctx }) => {
+      return listNotifications(uid(ctx));
+    }),
+    // 未读数：{ count: number }
+    unreadCount: tracedPublic.query(async ({ ctx }) => {
+      return unreadCount(uid(ctx));
+    }),
+    // 全部标记已读
+    markAllRead: tracedPublic.mutation(async ({ ctx }) => {
+      await markAllRead(uid(ctx));
+      return { ok: true };
+    }),
   }),
 
   // ============ 帖子互动 ============
@@ -104,19 +171,91 @@ export const featureRouter = createRouter({
       .use(rateLimit({ capacity: 30, refillPerSec: 1, key: actorKey }))
       .input(z.object({ postId: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        return toggleLike(uid(ctx), input.postId);
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再点赞" });
+        return toggleLike(ctx.user.id, input.postId, ctx.user.name ?? "钓友");
       }),
     comment: tracedPublic
       .use(rateLimit({ capacity: 10, refillPerSec: 0.2, key: actorKey, message: "评论太频繁了，休息一下" }))
-      .input(z.object({ postId: z.number(), content: z.string().min(1).max(500), authorName: z.string().default("钓友") }))
+      .input(z.object({ postId: z.number(), content: z.string().min(1).max(500), authorName: z.string().default("钓友"), parentId: z.number().optional() }))
       .mutation(async ({ ctx, input }) => {
-        await addComment(uid(ctx), input.postId, input.content, input.authorName);
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再评论" });
+        await addComment(ctx.user.id, input.postId, input.content, ctx.user.name ?? input.authorName, ctx.user.name ?? "钓友", input.parentId);
         return { ok: true };
       }),
+    // 帖子删除（软删）：仅作者本人，必须登录
+    delete: tracedPublic
+      .input(z.object({ postId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+        return deletePost(ctx.user.id, input.postId);
+      }),
+    // 帖子编辑：仅作者本人，必须登录
+    edit: tracedPublic
+      .input(z.object({
+        postId: z.number(),
+        content: z.string().min(1).max(1000).optional(),
+        images: z.array(z.string()).optional(),
+        fishSpecies: z.string().optional(),
+        weightJin: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+        const { postId, ...rest } = input;
+        return editPost(ctx.user.id, postId, rest);
+      }),
+    // 帖子搜索（v8.7.0）：关键词匹配内容/鱼种，分页
+    search: tracedPublic
+      .input(z.object({ keyword: z.string().min(1).max(64), page: z.number().min(1).default(1), pageSize: z.number().min(1).max(20).default(10) }))
+      .query(async ({ input }) => {
+        return searchPosts(input.keyword, input.page, input.pageSize);
+      }),
+    // 关注/取关（v8.7.0）
+    toggleFollow: tracedPublic
+      .use(rateLimit({ capacity: 30, refillPerSec: 1, key: actorKey }))
+      .input(z.object({ targetUserId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再关注" });
+        return toggleFollow(ctx.user.id, input.targetUserId);
+      }),
+    // 关注状态 + 粉丝数
+    followState: tracedPublic
+      .input(z.object({ targetUserId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        return followState(uid(ctx), input.targetUserId);
+      }),
+    // 关注动态流（v8.8.0）：仅我关注作者的帖子，时间倒序
+    followingFeed: tracedPublic
+      .input(z.object({ page: z.number().min(1).default(1), pageSize: z.number().min(1).max(20).default(5) }))
+      .query(async ({ ctx, input }) => {
+        return followingFeed(uid(ctx), input.page, input.pageSize);
+      }),
+    // 粉丝 / 关注列表（viewerId 用真实登录态，匿名 isFollowingBack 恒 false）
+    followersList: tracedPublic.query(async ({ ctx }) => {
+      return followersList(uid(ctx), ctx.user?.id ?? null);
+    }),
+    followingList: tracedPublic.query(async ({ ctx }) => {
+      return followingList(uid(ctx), ctx.user?.id ?? null);
+    }),
     comments: tracedPublic
       .input(z.object({ postId: z.number() }))
       .query(async ({ input }) => {
         return listComments(input.postId);
+      }),
+    // 帖子详情页：单帖查询（不存在返回 404）
+    detail: tracedPublic
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const post = await getPost(input.id);
+        if (!post) throw new TRPCError({ code: "NOT_FOUND", message: "帖子不存在或已删除" });
+        return post;
+      }),
+    // 渔获分享卡片（QY-COMM-009）：渲染卡片所需数据 + 落地页二维码 DataURL（失败降级 null）
+    shareCard: tracedPublic
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const card = await getShareCard(input.id);
+        if (!card) throw new TRPCError({ code: "NOT_FOUND", message: "帖子不存在或已删除" });
+        return card;
       }),
     create: tracedPublic
       .use(rateLimit({ capacity: 5, refillPerSec: 5 / 60, key: actorKey, message: "发布太频繁，请稍后再试" }))
@@ -126,11 +265,17 @@ export const featureRouter = createRouter({
         pondSlug: z.string().optional(),
         fishSpecies: z.string().optional(),
         weightJin: z.number().optional(),
+        // 发布定位（可选）：真实 GPS 坐标
+        latitude: z.number().min(-90).max(90).optional(),
+        longitude: z.number().min(-180).max(180).optional(),
+        // 定位可读地址（逆地理编码结果，可选）
+        locationText: z.string().max(128).optional(),
         authorName: z.string().max(64).default("钓友"),
       }))
       .mutation(async ({ ctx, input }) => {
-        const userId = uid(ctx);
-        const name = ctx.user?.name ?? input.authorName;
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再发布" });
+        const userId = ctx.user.id;
+        const name = ctx.user.name ?? input.authorName;
         const avatar = (ctx.user as { avatar?: string } | undefined)?.avatar ?? "/avatar-1.png";
         return createPost({ id: userId, name, avatar }, input);
       }),
@@ -151,15 +296,37 @@ export const featureRouter = createRouter({
         idempotencyKey: z.string().max(64).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        return createOrder(uid(ctx), input);
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再下单" });
+        return createOrder(ctx.user.id, input);
       }),
     mine: tracedPublic.query(async ({ ctx }) => {
       return myOrders(uid(ctx));
     }),
+    // 退款（v8.6.0）：仅本人待使用订单可退，CAS 状态机迁移；必须真实登录
+    refund: tracedPublic
+      .use(rateLimit({ capacity: 5, refillPerSec: 5 / 60, key: actorKey, message: "退款操作太频繁，请稍后再试" }))
+      .input(z.object({ orderId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再退款" });
+        return refundOrder(ctx.user.id, input.orderId);
+      }),
+    // 我绑定的钓场（塘主多钓场绑定）；登录即可调，零绑定返回空数组驱动前端认领引导
+    myPonds: tracedPublic.query(async ({ ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+      return myPonds({ id: ctx.user.id, role: ctx.user.role });
+    }),
+    // 自助认领钓场：认领码防爆破，用户+IP 双维度 5 次/min
+    claimPond: tracedPublic
+      .use(rateLimit({ capacity: 5, refillPerSec: 5 / 60, key: ipKey, message: "认领尝试过于频繁" }))
+      .use(rateLimit({ capacity: 5, refillPerSec: 5 / 60, key: (ctx) => `u:${ctx.user?.id ?? "anon"}`, message: "认领尝试过于频繁" }))
+      .input(z.object({ slug: z.string().min(1).max(64), code: z.string().min(4).max(32) }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再绑定钓场" });
+        return claimPond(ctx.user.id, input.slug, input.code);
+      }),
     verify: tracedPublic
       // 核销是资金敏感操作：必须登录（匿名 401，不走 DEMO_USER 兜底）。
-      // 塘主审核员认证：仅 role=admin 的账号可核销（unionId 命中 OWNER_UNION_ID 时建档即授 admin），
-      // 其余登录用户 403，防止普通用户核销他人门票。
+      // 塘主认证（v8.6.0 多钓场）：全局 admin 或 pond_admins 绑定塘主，且仅能核销自己管理钓场的订单。
       // 核销码 6 位数字可爆破 → IP + 用户双维度 5 次/min 严格限流（arch-v5 §8 P2 缓解），
       // IP 取真实连接地址（socket），不信任客户端可伪造的 XFF。
       .use(rateLimit({ capacity: 5, refillPerSec: 5 / 60, key: ipKey, message: "核销尝试过于频繁" }))
@@ -167,13 +334,8 @@ export const featureRouter = createRouter({
       .use(rateLimit({ capacity: 5, refillPerSec: 5 / 60, key: (ctx) => `u:${ctx.user?.id ?? "anon"}`, message: "核销尝试过于频繁" }))
       .input(z.object({ code: z.string().length(6) }))
       .mutation(async ({ ctx, input }) => {
-        if (!ctx.user) {
-          throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再核销" });
-        }
-        if (ctx.user.role !== "admin") {
-          throw new TRPCError({ code: "FORBIDDEN", message: "核销仅限钓场审核员账号，请完成塘主认证" });
-        }
-        return verifyOrder(input.code);
+        const user = await requireManager(ctx);
+        return verifyOrderScoped(user, input.code);
       }),
     review: tracedPublic
       .input(z.object({ orderId: z.number(), rating: z.number().min(1).max(5), content: z.string().max(500), tags: z.array(z.string()).default([]), images: z.array(z.string()).default([]) }))
@@ -183,16 +345,21 @@ export const featureRouter = createRouter({
         await reviewOrder(uid(ctx), authorName, input);
         return { ok: true };
       }),
-    // 塘主端看板：含核销码与营收，必须登录且 role=admin（校验写法对照 orders.verify）
-    ownerStats: tracedPublic.query(async ({ ctx }) => {
-      if (!ctx.user) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再查看塘主看板" });
-      }
-      if (ctx.user.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "塘主看板仅限钓场审核员账号" });
-      }
-      return ownerStats();
-    }),
+    // 塘主端看板（v8.6.0 作用域化）：全局 admin 看全站（可选 pondId 过滤）；
+    // 绑定塘主仅看自己绑定的钓场；零绑定返回全 0 看板（前端另有认领引导）
+    ownerStats: tracedPublic
+      .input(z.object({ pondId: z.number().optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        const user = await requireManager(ctx);
+        return ownerStatsScoped(user, input?.pondId);
+      }),
+    // 经营周报（v8.6.0）：接 owner_stats_daily 物化表，近 7 天 + 环比上周
+    ownerWeekly: tracedPublic
+      .input(z.object({ pondId: z.number().optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        const user = await requireManager(ctx);
+        return ownerWeekly(user, input?.pondId);
+      }),
   }),
 
   // ============ 商品 ============
@@ -214,23 +381,128 @@ export const featureRouter = createRouter({
         idempotencyKey: z.string().max(64).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        return createProductOrder(uid(ctx), input.items, input.idempotencyKey);
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再下单" });
+        return createProductOrder(ctx.user.id, input.items, input.idempotencyKey);
       }),
     mine: tracedPublic.query(async ({ ctx }) => {
       return myProductOrders(uid(ctx));
     }),
+    // 商品订单退款（v8.7.0）：仅本人 pending/paid 可退，CAS + 幂等（口径对照门票退款）
+    refund: tracedPublic
+      .use(rateLimit({ capacity: 5, refillPerSec: 5 / 60, key: actorKey, message: "退款操作太频繁，请稍后再试" }))
+      .input(z.object({ orderId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再退款" });
+        return refundProductOrder(ctx.user.id, input.orderId);
+      }),
+    // 确认收货：shipped → done
+    confirm: tracedPublic
+      .input(z.object({ orderId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+        return confirmProductOrder(ctx.user.id, input.orderId);
+      }),
+    // 模拟发货进度（测试用途）：pending → paid → shipped
+    advance: tracedPublic
+      .use(rateLimit({ capacity: 10, refillPerSec: 10 / 60, key: actorKey }))
+      .input(z.object({ orderId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+        return advanceProductOrder(ctx.user.id, input.orderId);
+      }),
   }),
 
   users: createRouter({
+    // 个人主页总览（真实统计）：发帖数/获赞/待使用票券/渔获墙/鱼种分布/等级/简介
+    overview: tracedPublic.query(async ({ ctx }) => {
+      return getProfileOverview(uid(ctx));
+    }),
+    // 关注统计（v8.7.0）：{ followers, following }
+    followStats: tracedPublic.query(async ({ ctx }) => {
+      return followStats(uid(ctx));
+    }),
     // 资料修改仅限真实登录用户（不走匿名演示兜底），并按 actorKey 限流
     update: tracedPublic
       .use(rateLimit({ capacity: 10, refillPerSec: 10 / 60, key: actorKey, message: "资料修改太频繁，请稍后再试" }))
-      .input(z.object({ name: z.string().min(1).max(64).optional(), avatar: z.string().max(255).optional(), avatarData: z.string().max(2_800_000).optional() }))
+      .input(z.object({ name: z.string().min(1).max(64).optional(), avatar: z.string().max(255).optional(), avatarData: z.string().max(2_800_000).optional(), bio: z.string().max(200).optional(), cover: z.string().max(255).optional(), coverData: z.string().max(5_000_000).optional() }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) {
           throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再修改资料" });
         }
         return updateUserProfile(ctx.user.id, input);
+      }),
+  }),
+
+  // ============ 塘主入驻申请（QY-D-002） ============
+  pondApply: createRouter({
+    // 提交入驻申请：必须真实登录；每用户 3 次/天限流；有 pending 申请时服务端幂等拒绝
+    submit: tracedPublic
+      .use(rateLimit({ capacity: 3, refillPerSec: 3 / 86400, key: (ctx) => `u:${ctx.user?.id ?? "anon"}`, message: "每天最多提交 3 次入驻申请" }))
+      .input(z.object({
+        pondName: z.string().min(1, "请填写塘名").max(64),
+        region: z.string().min(1, "请填写地区").max(64),
+        address: z.string().min(1, "请填写详细地址").max(128),
+        contactPhone: z.string().min(5, "请填写联系电话").max(32),
+        ticketDesc: z.string().min(1, "请填写票种意向").max(255),
+        note: z.string().max(500).optional(),
+        photoData: z.array(z.string().max(2_000_000)).max(4).default([]),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再提交入驻申请" });
+        return submitApplication(ctx.user.id, input);
+      }),
+    // 我的最近一次申请状态（表单页顶部状态卡；approved 时含 pondSlug/claimCode）
+    mine: tracedPublic.query(async ({ ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+      return myApplication(ctx.user.id);
+    }),
+    // 待审列表：仅全局 admin（塘主 FORBIDDEN，与 /moderation 举报队列的塘主作用域不同）
+    list: tracedPublic.query(async ({ ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "仅限平台管理员审核入驻申请" });
+      return listPendingApplications();
+    }),
+    // 待审数角标：仅 admin
+    pendingCount: tracedPublic.query(async ({ ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "仅限平台管理员" });
+      return pendingApplicationCount();
+    }),
+    // 审批：通过（事务内建塘 + 认领码 + 通知）/ 拒绝（备注必填 + 通知）；CAS 幂等
+    review: tracedPublic
+      .input(z.object({
+        applicationId: z.number(),
+        action: z.enum(["approve", "reject"]),
+        reviewNote: z.string().max(255).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "仅限平台管理员审核入驻申请" });
+        return reviewApplication({ id: ctx.user.id }, input.applicationId, input.action, input.reviewNote);
+      }),
+  }),
+
+  // ============ 内容举报与审核（v8.8.0） ============
+  moderation: createRouter({
+    // 举报帖子：必须真实登录；同一人同帖幂等（uq_report）
+    report: tracedPublic
+      .use(rateLimit({ capacity: 10, refillPerSec: 10 / 60, key: actorKey, message: "举报太频繁，请稍后再试" }))
+      .input(z.object({ postId: z.number(), reason: z.string().min(1).max(255) }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再举报" });
+        return reportPost(ctx.user.id, input.postId, input.reason);
+      }),
+    // 审核队列：admin 全站；绑定塘主仅自己钓场的帖子
+    list: tracedPublic.query(async ({ ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+      return listReports({ id: ctx.user.id, role: ctx.user.role });
+    }),
+    // 处理举报：忽略 / 下架帖子（CAS 防并发重复处理）
+    handle: tracedPublic
+      .input(z.object({ reportId: z.number(), action: z.enum(["ignore", "delete"]) }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+        return handleReport({ id: ctx.user.id, role: ctx.user.role }, input.reportId, input.action);
       }),
   }),
 });

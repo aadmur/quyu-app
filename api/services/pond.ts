@@ -6,8 +6,10 @@
  * detail 4 次串行查询 → Promise.all 并行 + 整页缓存（TTL 60s，写后失效）。
  */
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { fishNews, orders, ponds, reviews, seats, ticketTypes, type Pond } from "@db/schema";
-import { getCache, getDataSource, getSearch, timedRead, type Db } from "../infra";
+import { TRPCError } from "@trpc/server";
+import { fishNews, orders, pondMarks, ponds, reviews, seats, ticketTypes, type Pond } from "@db/schema";
+import { getCache, getDataSource, getSearch, isDupEntry, timedRead, type Db } from "../infra";
+import { assertContentAllowed } from "./contentFilter";
 
 /** 占座口径：同钓场、同游玩日、有效订单（pending=待核销 / used=已核销）中的 seat_nos */
 export const OCCUPIED_STATUSES = ["pending", "used"] as const;
@@ -98,19 +100,78 @@ export async function getPondDetail(slug: string, visitDate?: string): Promise<P
       : db
           .execute(sql`SELECT CURDATE() AS d`)
           .then((res) => String(((res as unknown as [[{ d: string }]])[0]?.[0]?.d ?? "").slice(0, 10)));
-    const [tickets, seatRows, news, reviewRows, day] = await Promise.all([
+    const [tickets, seatRows, news, reviewRows, reviewAgg, day] = await Promise.all([
       db.select().from(ticketTypes).where(eq(ticketTypes.pondId, pond.id)),
       db.select().from(seats).where(eq(seats.pondId, pond.id)),
       db.select().from(fishNews).where(eq(fishNews.pondId, pond.id)).orderBy(desc(fishNews.createdAt)).limit(5),
       db.select().from(reviews).where(eq(reviews.pondId, pond.id)).orderBy(desc(reviews.createdAt)).limit(10),
+      // 对账（QY-B-002）：真实 reviews 聚合，校正 ponds.rating/review_count 历史冗余列
+      db
+        .select({ cnt: sql<number>`COUNT(*)`, avg: sql<string | null>`AVG(${reviews.rating})` })
+        .from(reviews)
+        .where(eq(reviews.pondId, pond.id)),
       dayPromise,
     ]);
     const occupied = await occupiedSeats(db, pond.id, day);
     // 查询层覆盖计算：静态 is_sold 列不再作为展示口径
     const seatList = seatRows.map((s) => ({ ...s, isSold: occupied.has(s.seatNo) }));
-    return { ...pond, tickets, seats: seatList, news, reviews: reviewRows } as PondDetail;
+    // rating/reviewCount 以真实聚合为准；无真实评价时保留 ponds.rating 种子值（空集无法求均值）
+    const realCount = Number(reviewAgg[0]?.cnt ?? 0);
+    const realRating = realCount > 0 ? Number(reviewAgg[0]?.avg ?? 0).toFixed(1) : pond.rating;
+    const pondOut = { ...pond, rating: realRating, reviewCount: realCount };
+    return { ...pondOut, tickets, seats: seatList, news, reviews: reviewRows } as PondDetail;
   });
   return result === "none" ? null : result;
+}
+
+/** 评价分页结果（QY-B-002）：items 按 created_at 倒序；stats 为全量一次性聚合 */
+export interface PondReviewStats {
+  count: number;
+  avgRating: number;
+  dist: Record<1 | 2 | 3 | 4 | 5, number>;
+}
+export interface PondReviewPage {
+  items: (typeof reviews.$inferSelect)[];
+  hasMore: boolean;
+  stats: PondReviewStats;
+}
+
+/**
+ * 钓场评价列表（QY-B-002）：slug 反查 pondId，reviews 按 created_at 倒序分页。
+ * stats 每次全量聚合（COUNT/AVG/星级分布），与分页解耦，前端首屏即得评分分布条。
+ */
+export async function listPondReviews(slug: string, page = 1, pageSize = 10): Promise<PondReviewPage> {
+  const db = getDataSource().read();
+  const [pond] = await db.select({ id: ponds.id }).from(ponds).where(eq(ponds.slug, slug)).limit(1);
+  if (!pond) throw new TRPCError({ code: "NOT_FOUND", message: "钓场不存在" });
+  const p = Math.max(1, Math.floor(page));
+  const size = Math.min(50, Math.max(1, Math.floor(pageSize)));
+  const [items, aggRows, distRows] = await Promise.all([
+    db
+      .select()
+      .from(reviews)
+      .where(eq(reviews.pondId, pond.id))
+      .orderBy(desc(reviews.createdAt))
+      .limit(size)
+      .offset((p - 1) * size),
+    db
+      .select({ cnt: sql<number>`COUNT(*)`, avg: sql<string | null>`AVG(${reviews.rating})` })
+      .from(reviews)
+      .where(eq(reviews.pondId, pond.id)),
+    db
+      .select({ rating: reviews.rating, cnt: sql<number>`COUNT(*)` })
+      .from(reviews)
+      .where(eq(reviews.pondId, pond.id))
+      .groupBy(reviews.rating),
+  ]);
+  const dist: PondReviewStats["dist"] = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  for (const r of distRows) {
+    const k = Math.round(Number(r.rating));
+    if (k >= 1 && k <= 5) dist[k as 1 | 2 | 3 | 4 | 5] += Number(r.cnt);
+  }
+  const count = Number(aggRows[0]?.cnt ?? 0);
+  const avgRating = count > 0 ? +Number(aggRows[0]?.avg ?? 0).toFixed(1) : 0;
+  return { items, hasMore: p * size < count, stats: { count, avgRating, dist } };
 }
 
 /** 钓场侧写后失效（下单/评价后调用） */
@@ -118,13 +179,79 @@ export async function invalidatePondCache(): Promise<void> {
   await getCache().invalidateTag("pond");
 }
 
-/** 塘主发布鱼讯：写入 fish_news 并失效钓场缓存（详情页鱼讯列表即时可见）。 */
-export async function publishNews(pondSlug: string, content: string) {
+/**
+ * 塘主发布鱼讯：写入 fish_news 并失效钓场缓存（详情页鱼讯列表即时可见）。
+ * 内容前置过滤（QY-SAFE-002）：违禁词 reject 直接抛错不落库。
+ * 广告词 flag 时鱼讯照常落库；但 reports 表 post_id 非空且仅关联 posts（审核队列
+ * innerJoin posts），fish_news 无对应帖子可挂，故鱼讯 flag 只写审计日志（命中词/用户/前 20 字），
+ * 由日志告警承接人工复核——若要进审核队列需先扩展 reports 支持 fish_news（遗留项）。
+ */
+export async function publishNews(pondSlug: string, content: string, userId = 0) {
   const db = getDataSource().write();
+  assertContentAllowed(content, "news", userId);
   const [pond] = await db.select({ id: ponds.id }).from(ponds).where(eq(ponds.slug, pondSlug)).limit(1);
   if (!pond) throw new Error("钓场不存在");
   const res = await db.insert(fishNews).values({ pondId: pond.id, content });
   await getCache().invalidateTag("pond");
   const insertId = ((res as unknown as [{ insertId?: number }])[0]?.insertId) ?? 0;
   return { id: insertId, pondId: pond.id, content };
+}
+
+export type MarkKind = "fav" | "news";
+
+/**
+ * 收藏/订阅切换（原子去重，写法对照 community.toggleLike）。
+ * 插入撞 uq_pond_mark 唯一索引（ER_DUP_ENTRY）→ 已标记 → DELETE；成功则标记。
+ */
+export async function toggleMark(userId: number, pondSlug: string, kind: MarkKind): Promise<{ marked: boolean }> {
+  const db = getDataSource().write();
+  const [pond] = await db.select({ id: ponds.id }).from(ponds).where(eq(ponds.slug, pondSlug)).limit(1);
+  if (!pond) throw new TRPCError({ code: "NOT_FOUND", message: "钓场不存在" });
+  try {
+    await db.insert(pondMarks).values({ userId, pondId: pond.id, kind });
+  } catch (err) {
+    if (!isDupEntry(err)) throw err;
+    await db
+      .delete(pondMarks)
+      .where(and(eq(pondMarks.userId, userId), eq(pondMarks.pondId, pond.id), eq(pondMarks.kind, kind)));
+    return { marked: false };
+  }
+  return { marked: true };
+}
+
+/** 我的收藏/订阅 slug 集合（联查 ponds 取 slug） */
+export async function myMarks(userId: number): Promise<{ fav: string[]; news: string[] }> {
+  const rows = await timedRead("marks.mine", (db) =>
+    db
+      .select({ kind: pondMarks.kind, slug: ponds.slug })
+      .from(pondMarks)
+      .innerJoin(ponds, eq(pondMarks.pondId, ponds.id))
+      .where(eq(pondMarks.userId, userId)),
+  );
+  const out: { fav: string[]; news: string[] } = { fav: [], news: [] };
+  for (const r of rows) {
+    if (r.kind === "fav") out.fav.push(r.slug);
+    else if (r.kind === "news") out.news.push(r.slug);
+  }
+  return out;
+}
+
+/** 我收藏的钓场完整列表（按收藏时间倒序，取展示字段） */
+export async function myFavoritePonds(userId: number) {
+  return timedRead("marks.favorites", (db) =>
+    db
+      .select({
+        slug: ponds.slug,
+        name: ponds.name,
+        region: ponds.region,
+        priceFrom: ponds.priceFrom,
+        rating: ponds.rating,
+        cover: ponds.cover,
+        markedAt: pondMarks.createdAt,
+      })
+      .from(pondMarks)
+      .innerJoin(ponds, eq(pondMarks.pondId, ponds.id))
+      .where(and(eq(pondMarks.userId, userId), eq(pondMarks.kind, "fav")))
+      .orderBy(desc(pondMarks.createdAt)),
+  );
 }

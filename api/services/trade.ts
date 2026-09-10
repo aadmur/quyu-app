@@ -13,6 +13,7 @@ import { TRPCError } from "@trpc/server";
 import { orders, outboxEvents, ponds, reviews, ticketTypes, type Order } from "@db/schema";
 import { getDataSource, getQueue, isDupEntry, timedRead } from "../infra";
 import { invalidatePondCache, occupiedSeats } from "./pond";
+import { pushNotification } from "./notify";
 
 function genVerifyCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -172,6 +173,21 @@ export async function verifyOrder(code: string): Promise<VerifyResult> {
     // CAS 已命中 1 行，此处理论上必有行；仍判空兜底（防脏读/删库边界下裸 500）
     if (!found[0]) return { ok: false, reason: "核销状态异常，请重试" };
     await getQueue().publish("order.verified", { code, orderId: found[0].order.id });
+    // 消息中心：通知订单用户门票已核销（失败不阻断核销主流程）
+    try {
+      await pushNotification(
+        {
+          userId: found[0].order.userId,
+          type: "verify",
+          actorName: "塘主",
+          refId: found[0].order.id,
+          preview: `你的门票（核销码 ${code}）已核销`,
+        },
+        db,
+      );
+    } catch {
+      // 通知失败不阻断主流程
+    }
     return { ok: true, order: { ...found[0].order, pondName: found[0].pondName, ticketName: found[0].ticketName } };
   }
   // affected=0 → 查当前状态给出幂等语义化的失败原因（含过期判定，DB 会话时区口径）
@@ -182,6 +198,54 @@ export async function verifyOrder(code: string): Promise<VerifyResult> {
   if (!o) return { ok: false, reason: "核销码不存在" };
   if (o.status === "pending" && Number(o.expired) === 1) return { ok: false, reason: "该票已过期，不可核销" };
   return { ok: false, reason: "该票已核销或已退款" };
+}
+
+/** 退款（MVP 无真实支付渠道/商户资质，退款即状态迁移，refundAmount 供前端展示）。
+ *  状态机：pending→refunded，单条 CAS UPDATE，并发只有一方成功；
+ *  已 refunded 幂等返回成功（不重复退）；used/completed 不可退。
+ *  退款后钓位自动释放：occupiedSeats 占用口径仅统计 pending/used，refunded 自然不占。 */
+export async function refundOrder(
+  userId: number,
+  orderId: number,
+): Promise<{ orderId: number; refundAmount: number }> {
+  const db = getDataSource().write();
+  // 本人订单限定：查不到视为不存在（不泄露他人订单存在性，写法对照 reviewOrder）
+  const [o] = await db
+    .select()
+    .from(orders)
+    .where(and(eq(orders.id, orderId), eq(orders.userId, userId)))
+    .limit(1);
+  if (!o) throw new TRPCError({ code: "NOT_FOUND", message: "订单不存在" });
+  // 幂等快路径：已退款直接返回成功，不重复退
+  if (o.status === "refunded") return { orderId: o.id, refundAmount: o.totalAmount };
+  if (o.status !== "pending") {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "已核销订单不可退款" });
+  }
+
+  // 单条 CAS UPDATE（状态机 pending→refunded）：并发只有一方影响 1 行（写法对照 verifyOrder）
+  const res = await db.execute(sql`UPDATE orders SET status = 'refunded' WHERE id = ${orderId} AND status = 'pending'`);
+  if (affectedRows(res) === 0) {
+    throw new TRPCError({ code: "CONFLICT", message: "订单状态已变更，请刷新后重试" });
+  }
+
+  await invalidatePondCache(); // 写后失效（钓位占用释放）
+  await getQueue().publish("order.refunded", { orderId: o.id, userId, pondId: o.pondId, amount: o.totalAmount });
+  // 消息中心：通知用户退款已受理（失败不阻断退款主流程，写法对照 verifyOrder）
+  try {
+    await pushNotification(
+      {
+        userId,
+        type: "refund",
+        actorName: "系统",
+        refId: o.id,
+        preview: `你的门票退款已受理，金额 ¥${o.totalAmount}`,
+      },
+      db,
+    );
+  } catch {
+    // 通知失败不阻断主流程
+  }
+  return { orderId: o.id, refundAmount: o.totalAmount };
 }
 
 /** 订单评价（核销后）；写后失效钓场缓存。
