@@ -9,7 +9,10 @@ dist
 *.db
 *.sqlite
 *.sqlite3
-db/migrations/*.sql
+# 迁移 SQL 是生产 DDL 的唯一事实源（服务器无 node_modules，迁移靠手写 SQL 逐条执行），
+# 因此必须纳入版本控制；如需本地试验性迁移，请放到 db/migrations/local/ 并使用 *.local.sql
+db/migrations/local/
+db/migrations/*.local.sql
 # TypeScript cache
 *.tsbuildinfo
 # Build outputs

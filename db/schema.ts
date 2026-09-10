@@ -1,6 +1,6 @@
 import {
   mysqlTable, mysqlEnum, serial, varchar, text, int, bigint, timestamp,
-  decimal, boolean, json, uniqueIndex, index,
+  decimal, boolean, json, uniqueIndex, index, double,
 } from "drizzle-orm/mysql-core";
 
 // ============ 用户（后端嫁接自带） ============
@@ -10,11 +10,22 @@ export const users = mysqlTable("users", {
   name: varchar("name", { length: 255 }),
   email: varchar("email", { length: 320 }),
   avatar: text("avatar"),
+  // 个人简介（v8.6.0）：个人主页展示，NULL 时前端显示默认文案
+  bio: varchar("bio", { length: 200 }),
+  // 主页封面（v8.8.0）：自定义上传或内置封面 URL，NULL 时前端用默认封面
+  cover: varchar("cover", { length: 255 }),
+  // 账号密码登录（v8.2.0）：scrypt 加盐哈希，格式 scrypt:<saltHex>:<hashHex>；Kimi OAuth 用户为 NULL
+  passwordHash: varchar("passwordHash", { length: 255 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  // 账号注销冷静期（QY-E-005）：非 NULL 表示已申请注销，7 天冷静期到期后由定时任务匿名化；
+  // 匿名化完成后置回 NULL（unionId 已改为 deleted:<id>:<ts>，无法再登录，天然不会被重复扫描）
+  deletionRequestedAt: timestamp("deletion_requested_at"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
   lastSignInAt: timestamp("lastSignInAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_users_deletion").on(t.deletionRequestedAt),
+]);
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
@@ -36,9 +47,22 @@ export const ponds = mysqlTable("ponds", {
   intro: text("intro"),
   openHours: varchar("open_hours", { length: 64 }).notNull().default("06:00–22:00"),
   isOpen: boolean("is_open").notNull().default(true),
+  // 自助认领码（#6）：塘主凭码在 /owner 页自助绑定钓场；NULL 表示未开放认领
+  claimCode: varchar("claim_code", { length: 32 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [
   index("idx_ponds_region_rating").on(t.region, t.rating),
+]);
+
+// ============ 塘主-钓场绑定（#6：多钓场绑定 + 自助认证） ============
+export const pondAdmins = mysqlTable("pond_admins", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  pondId: bigint("pond_id", { mode: "number", unsigned: true }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("uq_pond_admin").on(t.userId, t.pondId),
+  index("idx_pond_admin_pond").on(t.pondId),
 ]);
 
 // ============ 票种 ============
@@ -85,9 +109,16 @@ export const posts = mysqlTable("posts", {
   pondSlug: varchar("pond_slug", { length: 64 }), // 冗余列：写入时填充，消除推荐召回的相关子查询 N+1
   fishSpecies: varchar("fish_species", { length: 32 }),
   weightJin: decimal("weight_jin", { precision: 5, scale: 1 }),
+  // 发布定位（v8.5.0）：用户开启「显示定位」时记录真实 GPS 坐标
+  latitude: double("latitude"),
+  longitude: double("longitude"),
+  // 定位可读地址（v8.6.0）：逆地理编码结果，展示用；为空时前端回退坐标
+  locationText: varchar("location_text", { length: 128 }),
   likeCount: int("like_count").notNull().default(0),
   commentCount: int("comment_count").notNull().default(0),
   impressionCount: int("impression_count").notNull().default(0), // 冗余列：曝光计数由事件消费者累加
+  // 软删（QY-COMM-004）：NULL=正常；删除后置为删除时间，点赞/评论等互动数据保留
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [
   index("idx_posts_created").on(t.createdAt),
@@ -126,6 +157,17 @@ export const likes = mysqlTable("likes", {
   index("idx_likes_post").on(t.postId),
 ]);
 
+// ============ 关注关系（QY-COMM-005：follower 关注 followee） ============
+export const follows = mysqlTable("follows", {
+  id: serial("id").primaryKey(),
+  followerId: bigint("follower_id", { mode: "number", unsigned: true }).notNull(),
+  followeeId: bigint("followee_id", { mode: "number", unsigned: true }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("uq_follow").on(t.followerId, t.followeeId),
+  index("idx_follow_followee").on(t.followeeId),
+]);
+
 // ============ 评论 ============
 export const comments = mysqlTable("comments", {
   id: serial("id").primaryKey(),
@@ -133,6 +175,8 @@ export const comments = mysqlTable("comments", {
   userId: bigint("user_id", { mode: "number", unsigned: true }),
   authorName: varchar("author_name", { length: 64 }).notNull(),
   content: varchar("content", { length: 500 }).notNull(),
+  // 楼中楼（QY-COMM-006）：NULL=顶层评论；回复时指向所属顶层评论（最多两层）
+  parentId: bigint("parent_id", { mode: "number", unsigned: true }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [index("idx_comments_post_created").on(t.postId, t.createdAt)]);
 
@@ -162,6 +206,33 @@ export const products = mysqlTable("products", {
   sales: int("sales").notNull().default(0),
 }, (t) => [
   index("idx_products_category").on(t.category, t.sales),
+]);
+
+// ============ 钓场收藏/订阅（fav 收藏 | news 订阅鱼讯） ============
+export const pondMarks = mysqlTable("pond_marks", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  pondId: bigint("pond_id", { mode: "number", unsigned: true }).notNull(),
+  kind: varchar("kind", { length: 8 }).notNull(), // fav 收藏 / news 订阅鱼讯
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("uq_pond_mark").on(t.userId, t.pondId, t.kind),
+  index("idx_marks_user").on(t.userId),
+]);
+
+// ============ 消息中心通知（点赞/评论/核销） ============
+export const notifications = mysqlTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(), // 接收者
+  type: varchar("type", { length: 16 }).notNull(), // like / comment / reply / verify / refund
+  actorName: varchar("actor_name", { length: 64 }).notNull(), // 动作发起者昵称
+  refId: bigint("ref_id", { mode: "number", unsigned: true }).notNull(), // 帖子 id 或订单 id
+  preview: varchar("preview", { length: 255 }).notNull().default(""), // 内容摘要（前 50 字）
+  // 注意：MySQL 中 read 是保留字，列名用 is_read
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("idx_notifications_user_read").on(t.userId, t.isRead),
 ]);
 
 // ============ 用户画像（推荐算法输入） ============
@@ -233,7 +304,50 @@ export const productOrders = mysqlTable("product_orders", {
   index("idx_porders_user").on(t.userId, t.createdAt),
 ]);
 
+// ============ 内容举报（v8.8.0 社区内容安全） ============
+export const reports = mysqlTable("reports", {
+  id: serial("id").primaryKey(),
+  reporterId: bigint("reporter_id", { mode: "number", unsigned: true }).notNull(), // 举报人
+  postId: bigint("post_id", { mode: "number", unsigned: true }).notNull(),         // 被举报帖子
+  reason: varchar("reason", { length: 255 }).notNull(),
+  status: varchar("status", { length: 16 }).notNull().default("pending"), // pending/ignored/actioned
+  handledBy: bigint("handled_by", { mode: "number", unsigned: true }),
+  handledAt: timestamp("handled_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("uq_report").on(t.reporterId, t.postId), // 同一人对同帖重复举报幂等
+  index("idx_reports_status").on(t.status),
+]);
+
+// ============ 塘主入驻申请（QY-D-002） ============
+export const pondApplications = mysqlTable("pond_applications", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(), // 申请人
+  pondName: varchar("pond_name", { length: 128 }).notNull(),
+  region: varchar("region", { length: 128 }).notNull(),       // 地区，如 武汉·江夏
+  address: varchar("address", { length: 255 }).notNull(),     // 详细地址（ponds 表无地址列，仅留在申请档案）
+  contactPhone: varchar("contact_phone", { length: 32 }).notNull(),
+  ticketDesc: varchar("ticket_desc", { length: 255 }).notNull(), // 票种意向（自由文本）
+  photos: json("photos").$type<string[]>().notNull(),          // ≤4 张，/uploads/applications/* URL
+  note: varchar("note", { length: 500 }),                      // 补充说明（可空）
+  status: varchar("status", { length: 16 }).notNull().default("pending"), // pending/approved/rejected
+  reviewNote: varchar("review_note", { length: 255 }),         // 审批备注（拒绝必填）
+  reviewedBy: bigint("reviewed_by", { mode: "number", unsigned: true }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
+  reviewedAt: timestamp("reviewed_at"),
+}, (t) => [
+  index("idx_pond_apps_user_status").on(t.userId, t.status),
+]);
+
+export type Report = typeof reports.$inferSelect;
+export type PondApplication = typeof pondApplications.$inferSelect;
+
 export type Pond = typeof ponds.$inferSelect;
+export type PondAdmin = typeof pondAdmins.$inferSelect;
+export type PondMark = typeof pondMarks.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
+export type Follow = typeof follows.$inferSelect;
 export type Post = typeof posts.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type TicketType = typeof ticketTypes.$inferSelect;

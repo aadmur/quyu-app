@@ -22,6 +22,62 @@
       "when": 1788430017622,
       "tag": "0002_product_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1788522650449,
+      "tag": "0003_password_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1788613005729,
+      "tag": "0004_marks_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1788617194066,
+      "tag": "0005_post_geo",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1788674555949,
+      "tag": "0006_v860_owner_binding",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1788677668470,
+      "tag": "0007_v870_social",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1788700731966,
+      "tag": "0008_v880_moderation",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1788704378721,
+      "tag": "0009_account_deletion",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1788706313921,
+      "tag": "0010_pond_applications",
+      "breakpoints": true
     }
   ]
 }
