@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 
 interface SuccessCheckProps {
   size?: number
@@ -7,7 +7,7 @@ interface SuccessCheckProps {
 /** 成功对勾：圆形湖水绿描边 scale spring 落位 + 对勾 stroke-dashoffset 描边动画（0.6s） */
 export default function SuccessCheck({ size = 96 }: SuccessCheckProps) {
   return (
-    <motion.svg
+    <m.svg
       width={size}
       height={size}
       viewBox="0 0 96 96"
@@ -16,7 +16,7 @@ export default function SuccessCheck({ size = 96 }: SuccessCheckProps) {
       transition={{ type: 'spring', stiffness: 300, damping: 18 }}
       aria-hidden="true"
     >
-      <motion.circle
+      <m.circle
         cx="48"
         cy="48"
         r="43"
@@ -27,7 +27,7 @@ export default function SuccessCheck({ size = 96 }: SuccessCheckProps) {
         animate={{ pathLength: 1 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
       />
-      <motion.path
+      <m.path
         d="M31 50 L43 62 L66 37"
         fill="none"
         stroke="#5e7a6e"
@@ -38,6 +38,6 @@ export default function SuccessCheck({ size = 96 }: SuccessCheckProps) {
         animate={{ pathLength: 1 }}
         transition={{ duration: 0.45, delay: 0.3, ease: 'easeOut' }}
       />
-    </motion.svg>
+    </m.svg>
   )
 }

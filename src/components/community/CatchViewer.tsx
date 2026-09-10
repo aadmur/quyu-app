@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { X, MessageCircle, Send, ChevronLeft, ChevronRight } from 'lucide-react'
 import FishIcon from '@/components/FishIcon'
 import { PROFILE } from '@/data/community'
@@ -34,7 +34,7 @@ export default function CatchViewer({ items, index, onChange, onClose }: CatchVi
   return (
     <AnimatePresence>
       {item && index !== null && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -63,7 +63,7 @@ export default function CatchViewer({ items, index, onChange, onClose }: CatchVi
 
             {/* 中部：图片，左右滑动切换 */}
             <div className="relative flex flex-1 items-center justify-center overflow-hidden">
-              <motion.img
+              <m.img
                 key={item.id}
                 src={item.src}
                 alt={item.caption}
@@ -121,7 +121,7 @@ export default function CatchViewer({ items, index, onChange, onClose }: CatchVi
                   onClick={() => setLiked((v) => !v)}
                   className="flex items-center gap-1.5"
                 >
-                  <motion.span
+                  <m.span
                     key={String(liked)}
                     initial={{ scale: 0.6 }}
                     animate={{ scale: 1 }}
@@ -129,7 +129,7 @@ export default function CatchViewer({ items, index, onChange, onClose }: CatchVi
                     className={liked ? 'text-heart' : 'text-white'}
                   >
                     <FishIcon active={liked} size={22} />
-                  </motion.span>
+                  </m.span>
                   <span className="font-num text-[15px] leading-none">
                     {(item.likes + (liked ? 1 : 0)).toLocaleString('en-US')}
                   </span>
@@ -142,7 +142,7 @@ export default function CatchViewer({ items, index, onChange, onClose }: CatchVi
               </div>
             </div>
           </div>
-        </motion.div>
+        </m.div>
       )}
     </AnimatePresence>
   )

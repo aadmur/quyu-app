@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import Lenis from 'lenis'
 import { Bell, Search, X } from 'lucide-react'
@@ -326,7 +326,7 @@ export default function Home() {
       {/* 下拉刷新指示：鱼形 loading 旋转 */}
       <AnimatePresence>
         {pull > 8 && (
-          <motion.div
+          <m.div
             className="flex justify-center overflow-hidden text-olive"
             animate={{ height: pull }}
             exit={{ height: 0 }}
@@ -335,13 +335,13 @@ export default function Home() {
             <div className={`flex items-center py-2 ${refreshing ? 'animate-spin' : ''}`}>
               <FishIcon size={28} />
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
       {/* Section 1 — TopBar（48px 吸顶，融背景）：左 logo，右搜索 + 消息铃铛（未读红点角标） */}
       <header className="sticky top-0 z-20 flex h-12 items-center justify-between bg-paper px-4">
-        <motion.img
+        <m.img
           src="/logo.svg"
           alt="趣渔"
           className="h-6 w-auto"
@@ -350,7 +350,7 @@ export default function Home() {
           transition={{ duration: 0.3, ease: 'easeOut' }}
         />
         <div className="flex items-center gap-1">
-          <motion.button
+          <m.button
             type="button"
             aria-label="搜索帖子"
             onClick={() => (searching ? clearSearch() : setSearchOpen((v) => !v))}
@@ -360,8 +360,8 @@ export default function Home() {
             className={`flex h-9 w-9 items-center justify-center ${searchOpen || searching ? 'text-olive' : 'text-ink'}`}
           >
             <Search size={22} strokeWidth={1.8} />
-          </motion.button>
-          <motion.button
+          </m.button>
+          <m.button
             type="button"
             aria-label="消息"
             onClick={() => navigate('/notifications')}
@@ -374,14 +374,14 @@ export default function Home() {
             {unreadCount > 0 && (
               <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-heart" aria-hidden="true" />
             )}
-          </motion.button>
+          </m.button>
         </div>
       </header>
 
       {/* 搜索输入条（QY-COMM-007）：放大镜展开，回车搜索，清空回到正常 feed */}
       <AnimatePresence>
         {(searchOpen || searching) && (
-          <motion.div
+          <m.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -415,46 +415,52 @@ export default function Home() {
                 搜索
               </button>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
       {/* Section 2 — Story 圈「钓友动态」（搜索态隐藏） */}
       {!searching && <StoryBar />}
 
-      {/* 信息流 Tab（QY-COMM-008）：推荐 / 关注（搜索态隐藏，下划线指示随顶栏风格） */}
+      {/* 信息流 Tab（QY-COMM-008）：推荐 / 关注（搜索态隐藏，下划线指示随顶栏风格）
+          下划线滑动原用 framer-motion layoutId（需 layout 能力，会把首屏动画
+          预算抬高 13KB gzip）。改为 CSS 绝对定位 + transition 实现，
+          视觉一致、零运行时布局测量开销（QY-PERF-005）。 */}
       {!searching && (
         <div className="sticky top-12 z-10 flex h-11 items-end gap-6 bg-paper px-4">
-          {(
-            [
-              { key: 'recommend', label: '推荐' },
-              { key: 'following', label: '关注' },
-            ] as const
-          ).map(({ key, label }) => {
-            const active = feedTab === key
-            return (
-              <button
-                key={key}
-                type="button"
-                aria-label={`${label}信息流`}
-                onClick={() => setFeedTab(key)}
-                className="relative flex h-11 items-center justify-center"
-              >
-                <span
-                  className={`text-[15px] leading-[22px] ${active ? 'font-semibold text-ink' : 'text-ink-40'}`}
+          <div className="relative flex h-11 items-end gap-6">
+            {(
+              [
+                { key: 'recommend', label: '推荐' },
+                { key: 'following', label: '关注' },
+              ] as const
+            ).map(({ key, label }) => {
+              const active = feedTab === key
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  aria-label={`${label}信息流`}
+                  onClick={() => setFeedTab(key)}
+                  className="relative flex h-11 items-center justify-center"
                 >
-                  {label}
-                </span>
-                {active && (
-                  <motion.span
-                    layoutId="home-feed-tab-indicator"
-                    transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-                    className="absolute bottom-0 h-0.5 w-6 rounded-full bg-ink"
-                  />
-                )}
-              </button>
-            )
-          })}
+                  <span
+                    className={`text-[15px] leading-[22px] ${active ? 'font-semibold text-ink' : 'text-ink-40'}`}
+                  >
+                    {label}
+                  </span>
+                </button>
+              )
+            })}
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute bottom-0 h-0.5 w-6 rounded-full bg-ink transition-transform duration-300 ease-out motion-reduce:transition-none"
+              style={{
+                // 两个 Tab 等宽（w-6 指示器 + gap-6 间距），按索引平移
+                transform: `translateX(${feedTab === 'following' ? 'calc(1.5rem + 1.5rem)' : '0'})`,
+              }}
+            />
+          </div>
         </div>
       )}
 
@@ -570,7 +576,7 @@ export default function Home() {
       {/* Section 4 — 信息流尽头 */}
       {feedEnded && (
         <div className="flex flex-col items-center gap-3 border-t border-line px-8 py-10">
-          <motion.img
+          <m.img
             src="/empty-creel.svg"
             alt="空鱼护"
             className="h-24 w-auto"
@@ -578,14 +584,14 @@ export default function Home() {
             transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
           />
           <p className="text-[15px] leading-[22px] text-ink-60">看到的都是老渔获啦，去甩一竿吧</p>
-          <motion.button
+          <m.button
             type="button"
             whileTap={{ scale: 0.97 }}
             onClick={() => navigate('/spots')}
             className="mt-1 h-12 w-full max-w-[280px] rounded-xl border border-olive bg-paper-white text-[15px] font-semibold text-olive"
           >
             去钓点看看
-          </motion.button>
+          </m.button>
         </div>
       )}
       </>
@@ -596,7 +602,7 @@ export default function Home() {
       {/* 收藏 toast：底部升起，2 秒自动消失 */}
       <AnimatePresence>
         {toast && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
@@ -604,14 +610,14 @@ export default function Home() {
             className="fixed inset-x-0 bottom-24 z-30 mx-auto w-fit rounded-full bg-ink px-4 py-2 text-[13px] leading-[18px] text-paper"
           >
             已收藏到渔获集
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
       {/* 网络异常 toast：接口降级为本地内容时提示 */}
       <AnimatePresence>
         {netToast && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
@@ -619,7 +625,7 @@ export default function Home() {
             className="fixed inset-x-0 bottom-24 z-30 mx-auto w-fit rounded-full bg-ink px-4 py-2 text-[13px] leading-[18px] text-paper"
           >
             {netToast}
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>

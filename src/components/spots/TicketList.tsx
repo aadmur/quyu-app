@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { Check } from 'lucide-react'
 import type { TicketType } from '@/data/spots'
 
@@ -17,7 +17,7 @@ export default function TicketList({ tickets, selectedId, onSelect }: TicketList
         {tickets.map((t, i) => {
           const active = t.id === selectedId
           return (
-            <motion.button
+            <m.button
               key={t.id}
               type="button"
               initial={{ opacity: 0, y: 20 }}
@@ -48,7 +48,7 @@ export default function TicketList({ tickets, selectedId, onSelect }: TicketList
               >
                 {active && <Check size={13} strokeWidth={2.6} className="text-paper-white" />}
               </span>
-            </motion.button>
+            </m.button>
           )
         })}
       </div>

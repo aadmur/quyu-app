@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { LogIn, Package, X } from 'lucide-react'
 import { trpc } from '@/providers/trpc'
 import { relativeTime } from '@/lib/live'
@@ -96,7 +96,7 @@ export default function ProductOrdersSheet({ open, onClose }: ProductOrdersSheet
     <AnimatePresence>
       {open && (
         <>
-          <motion.button
+          <m.button
             type="button"
             aria-label="关闭商品订单"
             className="fixed inset-0 z-40 bg-ink/35"
@@ -105,7 +105,7 @@ export default function ProductOrdersSheet({ open, onClose }: ProductOrdersSheet
             exit={{ opacity: 0 }}
             onClick={onClose}
           />
-          <motion.div
+          <m.div
             role="dialog"
             aria-label="商品订单"
             className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-md rounded-t-[20px] bg-paper px-5 pt-3"
@@ -264,7 +264,7 @@ export default function ProductOrdersSheet({ open, onClose }: ProductOrdersSheet
                 })}
               </ul>
             )}
-          </motion.div>
+          </m.div>
           <Toast message={toast} />
         </>
       )}

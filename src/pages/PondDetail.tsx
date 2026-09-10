@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Megaphone, Navigation, Star } from 'lucide-react'
 import { getPond } from '@/data/spots'
@@ -137,7 +137,7 @@ function PondReviewSection({
                     <Star size={10} strokeWidth={0} className="fill-olive text-olive" />
                   </span>
                   <div className="h-2 flex-1 overflow-hidden rounded-full bg-[#2d1e1e0d]">
-                    <motion.div
+                    <m.div
                       initial={{ scaleX: 0 }}
                       animate={{ scaleX: pct }}
                       transition={{ delay: i * 0.06, duration: 0.5, ease: 'easeOut' }}
@@ -172,7 +172,7 @@ function PondReviewSection({
       {/* 评价卡片列表 */}
       <div className="flex flex-col gap-2.5">
         {items.map((r) => (
-          <motion.div
+          <m.div
             key={r.id}
             initial={{ opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -222,7 +222,7 @@ function PondReviewSection({
               </div>
             )}
             <p className="mt-2 text-right text-[12px] leading-4 text-ink-40">{relativeTime(r.createdAt)}</p>
-          </motion.div>
+          </m.div>
         ))}
       </div>
 
@@ -339,25 +339,25 @@ export default function PondDetail() {
 
       {/* Section 2 — 塘名信息区 */}
       <section className="px-4 pb-4">
-        <motion.div {...infoStagger(0)} className="flex items-start justify-between gap-2">
+        <m.div {...infoStagger(0)} className="flex items-start justify-between gap-2">
           <h1 className="text-[28px] font-bold leading-[34px] text-ink">{pond.name}</h1>
           <span className="mt-1.5 flex shrink-0 items-center gap-1.5 rounded-full bg-lake-tint px-2.5 py-1 text-[12px] leading-4 text-lake">
-            <motion.span
+            <m.span
               animate={{ scale: [1, 1.4, 1] }}
               transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
               className="h-1.5 w-1.5 rounded-full bg-lake"
             />
             营业中
           </span>
-        </motion.div>
+        </m.div>
 
-        <motion.div {...infoStagger(1)} className="mt-2 flex items-center gap-2">
+        <m.div {...infoStagger(1)} className="mt-2 flex items-center gap-2">
           <RatingStars rating={pond.rating} />
           <span className="font-num text-[20px] leading-6 text-ink">{pond.rating}</span>
           <span className="text-[13px] leading-[18px] text-ink-60">· {pond.reviewCount} 条评价</span>
-        </motion.div>
+        </m.div>
 
-        <motion.div {...infoStagger(2)} className="mt-1.5 flex items-center justify-between gap-2">
+        <m.div {...infoStagger(2)} className="mt-1.5 flex items-center justify-between gap-2">
           <p className="min-w-0 truncate text-[13px] leading-[18px] text-ink-60">{pond.address}</p>
           <button
             type="button"
@@ -367,20 +367,20 @@ export default function PondDetail() {
             <Navigation size={15} strokeWidth={1.8} />
             导航
           </button>
-        </motion.div>
+        </m.div>
 
-        <motion.div {...infoStagger(3)} className="no-scrollbar -mx-4 mt-2.5 flex gap-1.5 overflow-x-auto px-4">
+        <m.div {...infoStagger(3)} className="no-scrollbar -mx-4 mt-2.5 flex gap-1.5 overflow-x-auto px-4">
           {pond.tags.map((t) => (
             <FishChip key={t} label={t} plain={!/鱼|鲫|鲤|鳊|鲈|鳜|翘嘴|青鱼|草鱼/.test(t)} />
           ))}
           {pond.categories.includes('night') && <FishChip label="可夜钓" plain />}
           <FishChip label="免费停车" plain />
           <FishChip label="可租竿" plain />
-        </motion.div>
+        </m.div>
       </section>
 
       {/* Section 3 — 实时鱼讯卡 */}
-      <motion.section
+      <m.section
         initial={{ opacity: 0, scale: 0.96 }}
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true, margin: '-10% 0px' }}
@@ -388,13 +388,13 @@ export default function PondDetail() {
         className="mx-4 mb-4 rounded-2xl bg-lake-tint p-3.5"
       >
         <div className="flex items-start gap-2.5">
-          <motion.span
+          <m.span
             animate={{ rotate: [-8, 8, -8] }}
             transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
             className="mt-0.5 shrink-0 text-lake"
           >
             <Megaphone size={20} strokeWidth={1.8} />
-          </motion.span>
+          </m.span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <img src={pond.news.ownerAvatar} alt={pond.news.owner} className="h-8 w-8 rounded-full bg-paper object-cover" />
@@ -411,19 +411,19 @@ export default function PondDetail() {
             {subscribed ? '已订阅 ✓' : '订阅鱼讯'}
           </button>
         </div>
-      </motion.section>
+      </m.section>
 
       {/* Section 4 — 钓场介绍（3 行折叠） */}
       <section className="mx-4 mb-6">
         <h2 className="mb-2 text-[18px] font-semibold leading-6 text-ink">钓场介绍</h2>
-        <motion.p
+        <m.p
           animate={{ maxHeight: expanded ? 400 : 66 }}
           initial={false}
           transition={{ duration: 0.35, ease: 'easeOut' }}
           className="max-w-[34em] overflow-hidden text-[15px] leading-[22px] text-ink"
         >
           {pond.intro}
-        </motion.p>
+        </m.p>
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
@@ -452,7 +452,7 @@ export default function PondDetail() {
       )}
 
       {/* Section 8 — 吸底购票栏 */}
-      <motion.div
+      <m.div
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         transition={{ type: 'spring', damping: 26, stiffness: 300, delay: 0.4 }}
@@ -465,7 +465,7 @@ export default function PondDetail() {
               <>
                 <p className="flex items-baseline gap-1">
                   <AnimatePresence mode="popLayout">
-                    <motion.span
+                    <m.span
                       key={ticket.price}
                       initial={{ y: 10, opacity: 0 }}
                       animate={{ y: 0, opacity: 1 }}
@@ -474,7 +474,7 @@ export default function PondDetail() {
                       className="font-num text-[32px] leading-9 text-clay"
                     >
                       ¥{ticket.price}
-                    </motion.span>
+                    </m.span>
                   </AnimatePresence>
                   <span className="text-[12px] leading-4 text-ink-40">起</span>
                 </p>
@@ -484,7 +484,7 @@ export default function PondDetail() {
               <p className="text-[15px] font-semibold leading-[22px] text-ink-60">暂无可售门票</p>
             )}
           </div>
-          <motion.button
+          <m.button
             type="button"
             whileTap={ticket ? { scale: 0.95 } : undefined}
             disabled={!ticket}
@@ -492,9 +492,9 @@ export default function PondDetail() {
             className="h-12 w-[180px] rounded-xl bg-olive text-[15px] font-semibold text-paper-white disabled:bg-olive/40"
           >
             {ticket ? '立即购票' : '暂不可购'}
-          </motion.button>
+          </m.button>
         </div>
-      </motion.div>
+      </m.div>
 
       {/* 弹层与 toast */}
       <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} onAction={show} />

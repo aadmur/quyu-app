@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { ImageDown, Link2, Loader2, X } from 'lucide-react'
 import { trpc } from '@/providers/trpc'
 import { CARD_H, CARD_W, canvasToPngBlob, renderShareCard } from '@/lib/shareCard'
@@ -117,7 +117,7 @@ export default function ShareCardSheet({ open, postId, onClose, onAction }: Shar
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-[60] flex items-end justify-center">
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 0.4 }}
             exit={{ opacity: 0 }}
@@ -125,7 +125,7 @@ export default function ShareCardSheet({ open, postId, onClose, onAction }: Shar
             className="absolute inset-0 bg-ink"
             onClick={onClose}
           />
-          <motion.div
+          <m.div
             role="dialog"
             aria-label="分享卡片"
             initial={{ y: '100%' }}
@@ -193,7 +193,7 @@ export default function ShareCardSheet({ open, postId, onClose, onAction }: Shar
                 复制链接
               </button>
             </div>
-          </motion.div>
+          </m.div>
         </div>
       )}
     </AnimatePresence>

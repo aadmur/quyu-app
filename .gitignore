@@ -5,6 +5,8 @@ dist
 .env
 .env.local
 .env.*.local
+# 本地冒烟测试环境（含数据库口令等敏感值，绝不入库）
+.env.smoke
 # Database
 *.db
 *.sqlite

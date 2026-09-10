@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { Download } from 'lucide-react'
 import { trpc } from '@/providers/trpc'
 
@@ -94,7 +94,7 @@ export default function UpdateSheet() {
     <AnimatePresence>
       {open && (
         <>
-          <motion.button
+          <m.button
             type="button"
             aria-label="关闭更新提示"
             className="fixed inset-0 z-[80] bg-ink/35"
@@ -103,7 +103,7 @@ export default function UpdateSheet() {
             exit={{ opacity: 0 }}
             onClick={close}
           />
-          <motion.div
+          <m.div
             role="dialog"
             aria-label="发现新版本"
             className="fixed inset-x-0 bottom-0 z-[90] mx-auto max-w-md rounded-t-[20px] bg-paper px-6 pt-3"
@@ -147,7 +147,7 @@ export default function UpdateSheet() {
                 </button>
               )}
             </div>
-          </motion.div>
+          </m.div>
         </>
       )}
     </AnimatePresence>

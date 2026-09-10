@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { NEWS_TEMPLATES } from '@/data/owner'
 import { trpc } from '@/providers/trpc'
 
@@ -37,7 +37,7 @@ export default function NewsComposer({ onPublished }: NewsComposerProps) {
   const publishing = publishMut.isPending
 
   return (
-    <motion.section
+    <m.section
       initial={{ opacity: 0, y: 16 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
@@ -83,7 +83,7 @@ export default function NewsComposer({ onPublished }: NewsComposerProps) {
       {/* 快捷模板胶囊横滑 */}
       <div className="no-scrollbar -mx-4 mt-2 flex gap-2 overflow-x-auto px-4">
         {NEWS_TEMPLATES.map((tpl) => (
-          <motion.button
+          <m.button
             key={tpl.label}
             type="button"
             whileTap={{ scale: 0.92 }}
@@ -91,12 +91,12 @@ export default function NewsComposer({ onPublished }: NewsComposerProps) {
             className="h-7 shrink-0 rounded-full bg-olive-tint px-3 text-[12px] leading-none text-olive"
           >
             {tpl.label}
-          </motion.button>
+          </m.button>
         ))}
       </div>
 
       <div className="mt-3 flex justify-end">
-        <motion.button
+        <m.button
           type="button"
           whileTap={{ scale: 0.96 }}
           onClick={publish}
@@ -104,8 +104,8 @@ export default function NewsComposer({ onPublished }: NewsComposerProps) {
           className="flex h-9 items-center justify-center rounded-xl bg-olive px-5 text-[13px] font-semibold leading-none text-paper-white disabled:opacity-50"
         >
           {publishing ? '发布中…' : '发布'}
-        </motion.button>
+        </m.button>
       </div>
-    </motion.section>
+    </m.section>
   )
 }

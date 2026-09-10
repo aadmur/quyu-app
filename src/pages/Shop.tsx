@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { Search, ShoppingBag, Receipt } from 'lucide-react'
 import Lenis from 'lenis'
 import ShopBanner from '@/components/shop/ShopBanner'
@@ -222,7 +222,7 @@ export default function Shop() {
   return (
     <div ref={rootRef}>
       {/* Section 1 — TopBar */}
-      <motion.header
+      <m.header
         className="sticky top-0 z-20 flex h-12 items-center justify-between bg-paper px-4"
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -246,7 +246,7 @@ export default function Shop() {
             <ShoppingBag size={24} strokeWidth={1.8} />
             {cartCount > 0 && (
               <AnimatePresence mode="popLayout">
-                <motion.span
+                <m.span
                   key={2 + addedCount}
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
@@ -254,12 +254,12 @@ export default function Shop() {
                   className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-clay px-1 font-num text-[11px] leading-none text-paper-white"
                 >
                   {cartCount}
-                </motion.span>
+                </m.span>
               </AnimatePresence>
             )}
           </button>
         </div>
-      </motion.header>
+      </m.header>
 
       {/* Section 2 — 场景横幅 */}
       <ShopBanner />
@@ -267,7 +267,7 @@ export default function Shop() {
       {/* 搜索框（展开时显示） */}
       <AnimatePresence>
         {searchOpen && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
@@ -280,7 +280,7 @@ export default function Shop() {
               placeholder="搜索商品：鱼竿 / 浮漂 / 饵料…"
               className="mb-2 w-full rounded-full border border-ink/10 bg-paper-white px-4 py-2 text-[14px] text-ink outline-none placeholder:text-ink-40"
             />
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
@@ -349,7 +349,7 @@ export default function Shop() {
       {/* 加购飞入动画元素 */}
       <AnimatePresence>
         {fly && (
-          <motion.img
+          <m.img
             key={fly.key}
             src={fly.image}
             alt=""
@@ -378,7 +378,7 @@ export default function Shop() {
       {/* Toast */}
       <AnimatePresence>
         {toast && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
@@ -386,7 +386,7 @@ export default function Shop() {
             className="fixed inset-x-0 bottom-24 z-50 mx-auto w-fit max-w-[320px] rounded-full bg-ink px-4 py-2 text-center text-[13px] leading-[18px] text-paper"
           >
             {toast}
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>

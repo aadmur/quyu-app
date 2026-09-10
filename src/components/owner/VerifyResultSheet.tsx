@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import type { PendingOrder } from '@/data/owner'
 
 /** 核销成功对勾描边动画（stroke-dashoffset 效果，0.6s） */
 function CheckDraw() {
   return (
     <svg width="72" height="72" viewBox="0 0 72 72" fill="none" aria-hidden="true">
-      <motion.circle
+      <m.circle
         cx="36"
         cy="36"
         r="32"
@@ -16,7 +16,7 @@ function CheckDraw() {
         animate={{ pathLength: 1 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
       />
-      <motion.path
+      <m.path
         d="M22 37 L32 47 L51 27"
         stroke="#5e7a6e"
         strokeWidth="4"
@@ -53,7 +53,7 @@ export default function VerifyResultSheet({ order, onDone }: VerifyResultSheetPr
     <AnimatePresence>
       {order && (
         <>
-          <motion.div
+          <m.div
             key="mask"
             className="fixed inset-0 z-[60] mx-auto max-w-[420px] bg-ink"
             initial={{ opacity: 0 }}
@@ -61,7 +61,7 @@ export default function VerifyResultSheet({ order, onDone }: VerifyResultSheetPr
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
           />
-          <motion.div
+          <m.div
             key="sheet"
             className="fixed inset-x-0 bottom-0 z-[60] mx-auto flex w-full max-w-[420px] flex-col items-center rounded-t-[20px] bg-paper-white px-6 pt-8"
             style={{ paddingBottom: 'max(var(--safe-bottom, 0px), 32px)' }}
@@ -97,15 +97,15 @@ export default function VerifyResultSheet({ order, onDone }: VerifyResultSheetPr
               </div>
             </div>
 
-            <motion.button
+            <m.button
               type="button"
               whileTap={{ scale: 0.97 }}
               onClick={() => onDone(order)}
               className="mt-5 h-12 w-full rounded-xl bg-olive text-[15px] font-semibold text-paper-white"
             >
               完成
-            </motion.button>
-          </motion.div>
+            </m.button>
+          </m.div>
         </>
       )}
     </AnimatePresence>

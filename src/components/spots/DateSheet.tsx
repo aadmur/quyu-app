@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 
 interface DateSheetProps {
   open: boolean
@@ -38,7 +38,7 @@ export default function DateSheet({ open, pondName, onClose, onConfirm }: DateSh
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 0.4 }}
             exit={{ opacity: 0 }}
@@ -46,7 +46,7 @@ export default function DateSheet({ open, pondName, onClose, onConfirm }: DateSh
             className="absolute inset-0 bg-ink"
             onClick={onClose}
           />
-          <motion.div
+          <m.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
@@ -76,15 +76,15 @@ export default function DateSheet({ open, pondName, onClose, onConfirm }: DateSh
                 )
               })}
             </div>
-            <motion.button
+            <m.button
               type="button"
               whileTap={{ scale: 0.97 }}
               onClick={() => onConfirm(days.find((d) => d.key === picked)?.key ?? days[0].key)}
               className="mt-5 h-12 w-full rounded-xl bg-olive text-[15px] font-semibold text-paper-white"
             >
               选好了，去购票
-            </motion.button>
-          </motion.div>
+            </m.button>
+          </m.div>
         </div>
       )}
     </AnimatePresence>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { X, Loader2 } from 'lucide-react'
 
 interface EditPostSheetProps {
@@ -18,14 +18,14 @@ export default function EditPostSheet({ initialContent, pending, onClose, onSave
 
   return (
     <>
-      <motion.div
+      <m.div
         className="fixed inset-0 z-40 bg-black"
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.4 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
       />
-      <motion.div
+      <m.div
         className="fixed inset-x-0 bottom-0 z-40 mx-auto flex max-h-[70dvh] max-w-[420px] flex-col rounded-t-[20px] bg-paper-white shadow-[0_8px_24px_rgba(45,30,30,0.12)]"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
@@ -72,7 +72,7 @@ export default function EditPostSheet({ initialContent, pending, onClose, onSave
             {pending ? <Loader2 size={17} className="animate-spin" /> : '保存'}
           </button>
         </div>
-      </motion.div>
+      </m.div>
     </>
   )
 }

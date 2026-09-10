@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Heart, Share2 } from 'lucide-react'
 
@@ -30,7 +30,7 @@ export default function PageHeader({ title, immersive = false, collected, onColl
   const solid = !immersive || scrolled
 
   const iconBtn = (label: string, onClick: (() => void) | undefined, node: ReactNode) => (
-    <motion.button
+    <m.button
       type="button"
       aria-label={label}
       whileTap={{ scale: 0.88 }}
@@ -40,7 +40,7 @@ export default function PageHeader({ title, immersive = false, collected, onColl
       }`}
     >
       {node}
-    </motion.button>
+    </m.button>
   )
 
   return (

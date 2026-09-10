@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 
 /** 可选钓位（数据来自 ponds.detail 的真实 seats） */
 export interface SeatOption {
@@ -53,14 +53,14 @@ export default function SeatSheet({ seats, selected, max, onConfirm, onClose }: 
 
   return (
     <>
-      <motion.div
+      <m.div
         className="fixed inset-0 z-40 bg-ink"
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.4 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
       />
-      <motion.div
+      <m.div
         className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-[420px] rounded-t-[20px] bg-paper-white shadow-[0_8px_24px_rgba(45,30,30,0.12)]"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
@@ -92,7 +92,7 @@ export default function SeatSheet({ seats, selected, max, onConfirm, onClose }: 
               const active = picked.includes(s.no)
               const pos = seatPos(s.no, seats.length)
               return (
-                <motion.button
+                <m.button
                   key={s.no}
                   type="button"
                   aria-label={`${s.no} 号钓位`}
@@ -120,7 +120,7 @@ export default function SeatSheet({ seats, selected, max, onConfirm, onClose }: 
                   }}
                 >
                   {s.no}
-                </motion.button>
+                </m.button>
               )
             })}
           </div>
@@ -141,7 +141,7 @@ export default function SeatSheet({ seats, selected, max, onConfirm, onClose }: 
           className="px-4 pt-4"
           style={{ paddingBottom: 'max(var(--safe-bottom, 0px), 16px)' }}
         >
-          <motion.button
+          <m.button
             type="button"
             whileTap={{ scale: 0.97 }}
             onClick={() => onConfirm(sorted)}
@@ -149,9 +149,9 @@ export default function SeatSheet({ seats, selected, max, onConfirm, onClose }: 
             className="flex h-12 w-full items-center justify-center rounded-xl bg-olive text-[15px] font-semibold leading-[22px] text-paper-white disabled:opacity-50"
           >
             确认钓位{sorted.length > 0 ? `（${sorted.length} 个）` : ''}
-          </motion.button>
+          </m.button>
         </div>
-      </motion.div>
+      </m.div>
     </>
   )
 }

@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { SHOP_CATEGORIES } from '@/data/shop'
 
 interface CategoryTabsProps {
@@ -13,7 +13,7 @@ export default function CategoryTabs({ active, onChange }: CategoryTabsProps) {
       {SHOP_CATEGORIES.map((cat) => {
         const isActive = cat === active
         return (
-          <motion.button
+          <m.button
             key={cat}
             type="button"
             whileTap={{ scale: 0.94 }}
@@ -23,14 +23,14 @@ export default function CategoryTabs({ active, onChange }: CategoryTabsProps) {
             }`}
           >
             {isActive && (
-              <motion.span
+              <m.span
                 layoutId="shop-cat-pill"
                 className="absolute inset-0 rounded-full bg-olive"
                 transition={{ type: 'spring', stiffness: 400, damping: 32 }}
               />
             )}
             <span className="relative z-10">{cat}</span>
-          </motion.button>
+          </m.button>
         )
       })}
     </div>

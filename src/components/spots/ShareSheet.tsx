@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { Link2, Share2 } from 'lucide-react'
 
 interface ShareSheetProps {
@@ -69,7 +69,7 @@ export default function ShareSheet({ open, onClose, onAction }: ShareSheetProps)
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 0.4 }}
             exit={{ opacity: 0 }}
@@ -77,7 +77,7 @@ export default function ShareSheet({ open, onClose, onAction }: ShareSheetProps)
             className="absolute inset-0 bg-ink"
             onClick={onClose}
           />
-          <motion.div
+          <m.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
@@ -108,7 +108,7 @@ export default function ShareSheet({ open, onClose, onAction }: ShareSheetProps)
             >
               取消
             </button>
-          </motion.div>
+          </m.div>
         </div>
       )}
     </AnimatePresence>

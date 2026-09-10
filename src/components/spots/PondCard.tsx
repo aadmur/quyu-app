@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Heart, Star } from 'lucide-react'
 import type { Pond } from '@/data/spots'
@@ -20,7 +20,7 @@ export default function PondCard({ pond, index }: PondCardProps) {
 
   return (
     <>
-    <motion.article
+    <m.article
       layout
       initial={{ opacity: 0, y: 32 }}
       whileInView={{ opacity: 1, y: 0 }}
@@ -31,7 +31,7 @@ export default function PondCard({ pond, index }: PondCardProps) {
     >
       {/* 封面图 3:2 */}
       <div className="relative">
-        <motion.img
+        <m.img
           src={pond.cover}
           alt={pond.name}
           whileHover={{ scale: 1.02 }}
@@ -45,7 +45,7 @@ export default function PondCard({ pond, index }: PondCardProps) {
           {pond.distanceKm}km
         </span>
         {/* 右上：收藏心形 */}
-        <motion.button
+        <m.button
           type="button"
           aria-label="收藏"
           whileTap={{ scale: 0.85 }}
@@ -56,7 +56,7 @@ export default function PondCard({ pond, index }: PondCardProps) {
           className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-ink/40 text-paper-white"
         >
           <Heart size={18} strokeWidth={1.8} fill={fav ? '#b3502e' : 'none'} className={fav ? 'text-heart' : ''} />
-        </motion.button>
+        </m.button>
       </div>
 
       {/* 今日鱼讯横幅（封面下缘） */}
@@ -91,7 +91,7 @@ export default function PondCard({ pond, index }: PondCardProps) {
             <span className="font-num text-[20px] leading-6 text-clay">¥{pond.priceFrom}</span>
             <span className="text-[12px] leading-4 text-ink-40">起</span>
           </p>
-          <motion.button
+          <m.button
             type="button"
             whileTap={{ scale: 0.95 }}
             onClick={(e) => {
@@ -101,10 +101,10 @@ export default function PondCard({ pond, index }: PondCardProps) {
             className="h-9 rounded-[10px] bg-olive px-4 text-[14px] font-semibold leading-none text-paper-white"
           >
             立即购票
-          </motion.button>
+          </m.button>
         </div>
       </div>
-    </motion.article>
+    </m.article>
     {/* 收藏反馈 toast + 未登录引导层（fixed 定位，不影响卡片布局） */}
     <Toast message={message} />
     {loginSheet}

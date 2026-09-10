@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 
 interface GalleryProps {
   images: string[]
@@ -20,7 +20,7 @@ export default function Gallery({ images, name }: GalleryProps) {
         }}
       >
         {images.map((src, i) => (
-          <motion.img
+          <m.img
             key={src}
             src={src}
             alt={`${name} 相册 ${i + 1}`}
@@ -36,7 +36,7 @@ export default function Gallery({ images, name }: GalleryProps) {
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[60px] bg-gradient-to-b from-transparent to-paper" />
       {/* 页码胶囊 */}
       <span className="absolute bottom-4 right-4 rounded-full bg-ink/40 px-2.5 py-1 font-num text-[12px] leading-4 text-paper-white">
-        <motion.span
+        <m.span
           key={index}
           initial={{ y: 6, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -44,7 +44,7 @@ export default function Gallery({ images, name }: GalleryProps) {
           className="inline-block"
         >
           {index + 1}
-        </motion.span>
+        </m.span>
         /{images.length}
       </span>
     </div>

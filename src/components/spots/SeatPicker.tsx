@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { Crown } from 'lucide-react'
 import type { Seat } from '@/data/spots'
 
@@ -35,7 +35,7 @@ export default function SeatPicker({ seats, selected, onSelect }: SeatPickerProp
           const sold = seat.status === 'sold'
           const vip = seat.status === 'vip'
           return (
-            <motion.button
+            <m.button
               key={seat.no}
               type="button"
               disabled={sold}
@@ -58,14 +58,14 @@ export default function SeatPicker({ seats, selected, onSelect }: SeatPickerProp
               {vip && !isSelected && (
                 <Crown size={9} strokeWidth={2} className="absolute right-0.5 top-0.5 text-olive" />
               )}
-              <motion.span
+              <m.span
                 animate={isSelected ? { scale: [1, 1.1, 1] } : { scale: 1 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 15 }}
                 className="inline-block"
               >
                 {seat.no}
-              </motion.span>
-            </motion.button>
+              </m.span>
+            </m.button>
           )
         })}
       </div>

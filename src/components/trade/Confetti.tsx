@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 
 const COLORS = ['#716a4b', '#5e7a6e', '#a8512f']
 
@@ -34,7 +34,7 @@ function ConfettiInner() {
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-64 overflow-hidden" aria-hidden="true">
       {pieces.map((p, i) => (
-        <motion.span
+        <m.span
           key={i}
           className="absolute -top-3 block"
           style={{

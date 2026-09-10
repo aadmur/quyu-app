@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import type { PendingOrder } from '@/data/owner'
 
 interface PendingOrdersProps {
@@ -30,10 +30,10 @@ export default function PendingOrders({ orders, total, onVerify }: PendingOrders
           </button>
         )}
       </div>
-      <motion.div layout>
+      <m.div layout>
         <AnimatePresence initial={false}>
           {visible.map((order, i) => (
-            <motion.div
+            <m.div
               key={order.id}
               layout
               initial={{ opacity: 0, x: -12 }}
@@ -49,18 +49,18 @@ export default function PendingOrders({ orders, total, onVerify }: PendingOrders
                   {order.ticket} · {order.seat} · {order.note}
                 </p>
               </div>
-              <motion.button
+              <m.button
                 type="button"
                 whileTap={{ scale: 0.94 }}
                 onClick={() => onVerify(order)}
                 className="h-8 shrink-0 rounded-full border border-olive px-3.5 text-[13px] font-semibold leading-none text-olive"
               >
                 核销
-              </motion.button>
-            </motion.div>
+              </m.button>
+            </m.div>
           ))}
         </AnimatePresence>
-      </motion.div>
+      </m.div>
       {orders.length === 0 && (
         <div className="flex flex-col items-center gap-2 rounded-xl bg-paper-white px-6 py-6 text-center">
           <img src="/empty-creel.svg" alt="" className="h-16 w-auto" />

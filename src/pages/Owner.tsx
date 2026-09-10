@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import PondStatusCard from '@/components/owner/PondStatusCard'
@@ -199,7 +199,7 @@ export default function Owner() {
   return (
     <div style={{ paddingBottom: 'max(var(--safe-bottom, 0px), 8px)' }}>
       {/* Section 1 — Header（二级页：返回 /me + 标题） */}
-      <motion.header
+      <m.header
         className="sticky top-0 z-20 flex h-12 items-center justify-between bg-paper px-2"
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -215,7 +215,7 @@ export default function Owner() {
         </button>
         <h1 className="text-[18px] font-semibold leading-6 text-ink">塘主工作台</h1>
         <span className="h-10 w-10" aria-hidden="true" />
-      </motion.header>
+      </m.header>
 
       {/* Section 1.5 — 钓场选择（#6）：多钓场横滑切换（含「全部」），单钓场直接展示名称 */}
       {myPondList.length === 1 && (
@@ -301,7 +301,7 @@ export default function Owner() {
 
       {/* 塘主认证引导：未登录/未绑定/ownerStats 403 时显示；已登录零绑定 → 认领码自助绑定表单（#6） */}
       {(!canOperate || statsForbidden) && !meQuery.isLoading && (
-        <motion.section
+        <m.section
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           className="mx-4 mb-4 rounded-2xl border border-dashed border-olive bg-olive-tint p-4"
@@ -377,7 +377,7 @@ export default function Owner() {
               </div>
             </>
           )}
-        </motion.section>
+        </m.section>
       )}
 
       {/* Section 6 — 发布鱼讯快捷区（全局管理员/已绑定塘主可用） */}
@@ -387,7 +387,7 @@ export default function Owner() {
 
       {/* Section 7 — 经营周报（#7：owner_stats_daily 近 7 个完整日 + 环比）；接口未就绪时回退 mock 条形图 */}
       {weeklyLive ? (
-        <motion.section
+        <m.section
           initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.2 }}
@@ -444,7 +444,7 @@ export default function Owner() {
               </div>
             )
           })()}
-        </motion.section>
+        </m.section>
       ) : (
         <WeekChart />
       )}
@@ -476,7 +476,7 @@ export default function Owner() {
       {/* Toast */}
       <AnimatePresence>
         {toast && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
@@ -484,7 +484,7 @@ export default function Owner() {
             className="fixed inset-x-0 bottom-24 z-[70] mx-auto w-fit max-w-[320px] rounded-full bg-ink px-4 py-2 text-center text-[13px] leading-[18px] text-paper"
           >
             {toast}
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>

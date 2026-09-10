@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Camera, X, Loader2, Store, CircleCheck, CircleX, Clock } from 'lucide-react'
 import PageHeader from '@/components/trade/PageHeader'
@@ -125,7 +125,7 @@ export default function PondApply() {
 
       {/* 最近一次申请状态卡 */}
       {me && latest && (
-        <motion.section
+        <m.section
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: 'easeOut' }}
@@ -172,7 +172,7 @@ export default function PondApply() {
               ，可修改资料后重新提交。
             </p>
           )}
-        </motion.section>
+        </m.section>
       )}
 
       {/* 申请表单（pending 时禁用） */}
@@ -254,7 +254,7 @@ export default function PondApply() {
             <div className="mt-2 flex flex-wrap gap-2">
               <AnimatePresence>
                 {photos.map((src, idx) => (
-                  <motion.div
+                  <m.div
                     key={`${idx}-${src.length}`}
                     initial={{ scale: 0.6, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
@@ -271,11 +271,11 @@ export default function PondApply() {
                     >
                       <X size={12} strokeWidth={2.2} />
                     </button>
-                  </motion.div>
+                  </m.div>
                 ))}
               </AnimatePresence>
               {photos.length < MAX_PHOTOS && latest?.status !== 'pending' && (
-                <motion.button
+                <m.button
                   type="button"
                   whileTap={{ scale: 0.95 }}
                   onClick={() => fileRef.current?.click()}
@@ -283,7 +283,7 @@ export default function PondApply() {
                 >
                   <Camera size={22} strokeWidth={1.8} />
                   <span className="text-[12px] leading-4">添加</span>
-                </motion.button>
+                </m.button>
               )}
               <input
                 ref={fileRef}
@@ -323,7 +323,7 @@ export default function PondApply() {
           className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-[420px] border-t border-line bg-paper-white px-4 pt-3"
           style={{ paddingBottom: 'max(var(--safe-bottom, 0px), 16px)' }}
         >
-          <motion.button
+          <m.button
             type="button"
             whileTap={canSubmit ? { scale: 0.97 } : undefined}
             onClick={submit}
@@ -334,7 +334,7 @@ export default function PondApply() {
           >
             {submitMut.isPending && <Loader2 size={18} strokeWidth={2} className="animate-spin" />}
             {submitMut.isPending ? '提交中…' : latest?.status === 'pending' ? '审核中，暂不可提交' : latest?.status === 'rejected' ? '重新提交申请' : '提交入驻申请'}
-          </motion.button>
+          </m.button>
         </div>
       )}
     </div>

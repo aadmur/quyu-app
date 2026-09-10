@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { MapPin, Search, Check } from 'lucide-react'
 import FishIcon from '@/components/FishIcon'
 import { FISH_SPECIES, PUBLISH_SPOTS } from '@/data/community'
@@ -20,7 +20,7 @@ function SheetShell({
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-[60] flex items-end justify-center">
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 0.4 }}
             exit={{ opacity: 0 }}
@@ -28,7 +28,7 @@ function SheetShell({
             className="absolute inset-0 bg-ink"
             onClick={onClose}
           />
-          <motion.div
+          <m.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
@@ -40,7 +40,7 @@ function SheetShell({
               <h3 className="text-[15px] font-semibold leading-[22px] text-ink">{title}</h3>
             </div>
             {children}
-          </motion.div>
+          </m.div>
         </div>
       )}
     </AnimatePresence>
@@ -65,7 +65,7 @@ export function SpeciesPicker({
         {FISH_SPECIES.map((species, i) => {
           const active = value === species
           return (
-            <motion.button
+            <m.button
               key={species}
               type="button"
               initial={{ scale: 0.8, opacity: 0 }}
@@ -82,7 +82,7 @@ export function SpeciesPicker({
             >
               <FishIcon size={16} className={active ? 'text-paper-white' : 'text-olive'} />
               {species}
-            </motion.button>
+            </m.button>
           )
         })}
       </div>

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Star, Camera, X, Loader2 } from 'lucide-react'
 import PageHeader from '@/components/trade/PageHeader'
@@ -115,7 +115,7 @@ export default function Review() {
   /* 提交成功：全屏轻量反馈，回流首页社区流 */
   if (done) {
     return (
-      <motion.div
+      <m.div
         className="flex flex-col items-center bg-paper px-8 pt-20"
         style={{
           minHeight: 'calc(100dvh - max(var(--safe-top, 0px), 44px))',
@@ -125,38 +125,38 @@ export default function Review() {
         animate={{ opacity: 1 }}
       >
         <SuccessCheck size={96} />
-        <motion.h2
+        <m.h2
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.3, ease: 'easeOut' }}
           className="mt-5 text-[28px] font-bold leading-[34px] text-ink"
         >
           感谢分享！
-        </motion.h2>
-        <motion.p
+        </m.h2>
+        <m.p
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.38, ease: 'easeOut' }}
           className="mt-1 text-[13px] leading-[18px] text-ink-60"
         >
           评价已同步到社区
-        </motion.p>
-        <motion.div
+        </m.p>
+        <m.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.5, ease: 'easeOut' }}
           className="mt-auto w-full pt-10"
         >
-          <motion.button
+          <m.button
             type="button"
             whileTap={{ scale: 0.97 }}
             onClick={() => navigate('/')}
             className="flex h-12 w-full items-center justify-center rounded-xl bg-olive text-[15px] font-semibold leading-[22px] text-paper-white"
           >
             去社区看看
-          </motion.button>
-        </motion.div>
-      </motion.div>
+          </m.button>
+        </m.div>
+      </m.div>
     )
   }
 
@@ -217,7 +217,7 @@ export default function Review() {
           {[1, 2, 3, 4, 5].map((n) => {
             const active = n <= stars
             return (
-              <motion.button
+              <m.button
                 key={n}
                 type="button"
                 aria-label={`${n} 星`}
@@ -232,14 +232,14 @@ export default function Review() {
                   strokeWidth={1.5}
                   className={active ? 'fill-olive text-olive' : 'fill-transparent text-[#2d1e1e33]'}
                 />
-              </motion.button>
+              </m.button>
             )
           })}
         </div>
         <div className="mt-2 flex h-[18px] items-center justify-center">
           <AnimatePresence mode="wait">
             {stars > 0 && (
-              <motion.p
+              <m.p
                 key={stars}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -248,7 +248,7 @@ export default function Review() {
                 className="text-[13px] leading-[18px] text-olive"
               >
                 {STAR_TEXTS[stars - 1]}
-              </motion.p>
+              </m.p>
             )}
           </AnimatePresence>
         </div>
@@ -260,7 +260,7 @@ export default function Review() {
           {stars >= 1 && stars <= 3 ? '说说差在哪（可多选）' : '说说好在哪（可多选）'}
         </p>
         <AnimatePresence mode="wait">
-          <motion.div
+          <m.div
             key={stars >= 4 || stars === 0 ? 'pos' : 'neg'}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -271,7 +271,7 @@ export default function Review() {
             {tagPool.map((t) => {
               const active = tags.includes(t)
               return (
-                <motion.button
+                <m.button
                   key={t}
                   type="button"
                   whileTap={{ scale: 0.92 }}
@@ -283,10 +283,10 @@ export default function Review() {
                   }`}
                 >
                   {t}
-                </motion.button>
+                </m.button>
               )
             })}
-          </motion.div>
+          </m.div>
         </AnimatePresence>
       </section>
 
@@ -315,7 +315,7 @@ export default function Review() {
         <div className="mt-3 flex gap-2">
           <AnimatePresence>
             {photos.map((src, idx) => (
-              <motion.div
+              <m.div
                 key={`${idx}-${src.length}`}
                 initial={{ scale: 0.6, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -332,11 +332,11 @@ export default function Review() {
                 >
                   <X size={12} strokeWidth={2.2} />
                 </button>
-              </motion.div>
+              </m.div>
             ))}
           </AnimatePresence>
           {photos.length < MAX_PHOTOS && (
-            <motion.button
+            <m.button
               type="button"
               whileTap={{ scale: 0.95 }}
               onClick={() => fileRef.current?.click()}
@@ -344,7 +344,7 @@ export default function Review() {
             >
               <Camera size={22} strokeWidth={1.8} />
               <span className="text-[12px] leading-4">添加</span>
-            </motion.button>
+            </m.button>
           )}
           <input
             ref={fileRef}
@@ -364,7 +364,7 @@ export default function Review() {
         className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-[420px] border-t border-line bg-paper-white px-4 pt-3"
         style={{ paddingBottom: 'max(var(--safe-bottom, 0px), 16px)' }}
       >
-        <motion.button
+        <m.button
           type="button"
           whileTap={stars ? { scale: 0.97 } : undefined}
           onClick={submit}
@@ -375,7 +375,7 @@ export default function Review() {
         >
           {submitting && <Loader2 size={18} strokeWidth={2} className="animate-spin" />}
           {submitting ? '发布中…' : stars ? '发布评价' : '先打个星吧'}
-        </motion.button>
+        </m.button>
       </div>
     </div>
   )

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { STORIES } from '@/data/home'
@@ -21,7 +21,7 @@ export default function StoryBar() {
     <>
       <div className="no-scrollbar flex gap-4 overflow-x-auto px-4 py-3" aria-label="钓友动态">
         {/* 首枚：我的「发动态」——灰色虚线环 + 右下角 + 角标 */}
-        <motion.div
+        <m.div
           initial={{ opacity: 0, scale: 0.6 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.3, ease: 'easeOut' }}
@@ -39,19 +39,19 @@ export default function StoryBar() {
             </span>
           </button>
           <span className="w-16 truncate text-center text-[11px] leading-4 text-ink-60">发动态</span>
-        </motion.div>
+        </m.div>
 
         {STORIES.map((story, i) => {
           const seen = story.seen || seenIds.has(story.id)
           return (
-            <motion.div
+            <m.div
               key={story.id}
               initial={{ opacity: 0, scale: 0.6 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3, ease: 'easeOut', delay: 0.05 * (i + 1) }}
               className="flex w-16 shrink-0 flex-col items-center gap-1"
             >
-              <motion.button
+              <m.button
                 type="button"
                 whileTap={{ scale: 0.9 }}
                 onClick={() => openStory(story)}
@@ -66,14 +66,14 @@ export default function StoryBar() {
                     直播
                   </span>
                 )}
-              </motion.button>
+              </m.button>
               <span className="w-16 truncate text-center text-[11px] leading-4 text-ink">
                 {story.name}
               </span>
               {story.official && (
                 <span className="-mt-1 text-[10px] leading-3 text-lake">鱼讯</span>
               )}
-            </motion.div>
+            </m.div>
           )
         })}
       </div>

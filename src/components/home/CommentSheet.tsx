@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { X } from 'lucide-react'
 import type { FeedComment } from '@/data/home'
 import { trpc } from '@/providers/trpc'
@@ -7,6 +7,7 @@ import { useAuthGate } from '@/components/LoginSheet'
 import { mapComment } from '@/lib/live'
 import Toast from '@/components/community/Toast'
 import { useToast } from '@/components/community/useToast'
+import BottomSheet from '@/components/home/BottomSheet'
 
 interface CommentSheetProps {
   comments: FeedComment[]
@@ -63,25 +64,18 @@ export default function CommentSheet({ comments, total, postId, onClose }: Comme
 
   return (
     <>
-      <motion.div
+      <m.div
         className="fixed inset-0 z-40 bg-black"
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.4 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
       />
-      <motion.div
+      <BottomSheet
+        onClose={onClose}
+        threshold={120}
+        elastic={0.5}
         className="fixed inset-x-0 bottom-0 z-40 mx-auto flex h-[70dvh] max-w-[420px] flex-col rounded-t-[20px] bg-paper-white shadow-[0_8px_24px_rgba(45,30,30,0.12)]"
-        initial={{ y: '100%' }}
-        animate={{ y: 0 }}
-        exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-        drag="y"
-        dragConstraints={{ top: 0, bottom: 0 }}
-        dragElastic={{ top: 0, bottom: 0.5 }}
-        onDragEnd={(_, info) => {
-          if (info.offset.y > 120 || info.velocity.y > 500) onClose()
-        }}
       >
         <div className="flex h-12 shrink-0 items-center justify-center border-b border-line">
           <span className="text-[15px] font-semibold leading-[22px]">全部 {total} 条评论</span>
@@ -90,7 +84,7 @@ export default function CommentSheet({ comments, total, postId, onClose }: Comme
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-3">
+        <div className="qy-sheet-scroll flex-1 overflow-y-auto px-4 py-3">
           {live && commentsQuery.isLoading &&
             [0, 1, 2].map((i) => (
               <div key={`sk-${i}`} className="flex animate-pulse gap-3 py-2.5">
@@ -102,7 +96,7 @@ export default function CommentSheet({ comments, total, postId, onClose }: Comme
               </div>
             ))}
           {list.map((c, i) => (
-            <motion.div
+            <m.div
               key={c.id}
               initial={{ opacity: 0, x: -8 }}
               animate={{ opacity: 1, x: 0 }}
@@ -119,7 +113,7 @@ export default function CommentSheet({ comments, total, postId, onClose }: Comme
               <span className="shrink-0 self-start pt-1 font-num text-[13px] leading-4 text-ink-40">
                 {c.likes > 0 ? `${c.likes} 赞` : ''}
               </span>
-            </motion.div>
+            </m.div>
           ))}
         </div>
 
@@ -144,7 +138,7 @@ export default function CommentSheet({ comments, total, postId, onClose }: Comme
             发送
           </button>
         </div>
-      </motion.div>
+      </BottomSheet>
 
       {loginSheet}
       <Toast message={toast} />

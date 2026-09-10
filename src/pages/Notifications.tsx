@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { CheckCheck, MessageCircle, Store, TicketCheck } from 'lucide-react'
 import type { inferRouterOutputs } from '@trpc/server'
@@ -51,7 +51,7 @@ function NotifyRow({ item, index }: { item: NotifyItem; index: number }) {
   }
 
   return (
-    <motion.button
+    <m.button
       type="button"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
@@ -76,7 +76,7 @@ function NotifyRow({ item, index }: { item: NotifyItem; index: number }) {
         )}
         <span className="mt-1 block text-[12px] leading-4 text-ink-40">{relativeTime(item.createdAt)}</span>
       </span>
-    </motion.button>
+    </m.button>
   )
 }
 
@@ -159,7 +159,7 @@ export default function Notifications() {
         </div>
       ) : items.length === 0 ? (
         /* 空态 */
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: 'easeOut' }}
@@ -167,7 +167,7 @@ export default function Notifications() {
         >
           <img src="/empty-creel.svg" alt="" className="h-40 w-[200px]" />
           <p className="mt-4 text-[15px] leading-[22px] text-ink-60">暂无消息</p>
-        </motion.div>
+        </m.div>
       ) : (
         <div>
           {items.map((item, i) => (

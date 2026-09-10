@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import type { Product } from '@/data/shop'
 
 interface ProductCardProps {
@@ -10,7 +10,7 @@ interface ProductCardProps {
 /** 商品卡：白底圆角 12、1px line、零阴影；1:1 图 + 标签 + 价格行 */
 export default function ProductCard({ product, index, onOpen }: ProductCardProps) {
   return (
-    <motion.button
+    <m.button
       type="button"
       onClick={() => onOpen(product)}
       initial={{ opacity: 0, y: 28 }}
@@ -46,6 +46,6 @@ export default function ProductCard({ product, index, onOpen }: ProductCardProps
           <span className="ml-auto text-[12px] leading-4 text-ink-40">已售 {product.sales}</span>
         </div>
       </div>
-    </motion.button>
+    </m.button>
   )
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { ChevronDown, ChevronRight, Star } from 'lucide-react'
 import type { PondReview } from '@/data/spots'
 
@@ -39,7 +39,7 @@ export default function ReviewList({ reviews, total }: ReviewListProps) {
       </div>
       <div className="flex flex-col gap-2.5">
         {visible.map((r, i) => (
-          <motion.div
+          <m.div
             key={r.id}
             initial={{ opacity: 0, x: -16 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -73,7 +73,7 @@ export default function ReviewList({ reviews, total }: ReviewListProps) {
               )}
               <span className="text-[12px] leading-4 text-ink-40">{r.time}</span>
             </div>
-          </motion.div>
+          </m.div>
         ))}
       </div>
       {reviews.length === 0 && (

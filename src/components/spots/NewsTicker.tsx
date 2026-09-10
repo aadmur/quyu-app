@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import type { PondNewsFlash } from '@/data/spots'
 
@@ -14,7 +14,7 @@ export default function NewsTicker({ items }: NewsTickerProps) {
       {/* 区块标题行：H2 + 呼吸圆点 +「直播中」 */}
       <div className="mb-2 flex items-center gap-1.5 px-4">
         <h2 className="text-[18px] font-semibold leading-6 text-ink">实时鱼讯</h2>
-        <motion.span
+        <m.span
           animate={{ scale: [1, 1.4, 1] }}
           transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
           className="ml-1 h-1.5 w-1.5 rounded-full bg-lake"
@@ -23,7 +23,7 @@ export default function NewsTicker({ items }: NewsTickerProps) {
       </div>
       <div className="no-scrollbar flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4">
         {items.map((n, i) => (
-          <motion.button
+          <m.button
             key={n.id}
             type="button"
             onClick={() => navigate(`/pond/${n.pondId}`)}
@@ -35,7 +35,7 @@ export default function NewsTicker({ items }: NewsTickerProps) {
             <p className="text-[13px] font-semibold leading-[18px] text-ink">{n.pondName}</p>
             <p className="mt-0.5 line-clamp-2 flex-1 text-[13px] leading-[18px] text-ink-60">{n.text}</p>
             <p className="text-[12px] leading-4 text-ink-40">{n.time}</p>
-          </motion.button>
+          </m.button>
         ))}
       </div>
     </section>

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { Home, MapPin, ShoppingBag, User, Plus, Signal, Wifi, BatteryFull } from 'lucide-react'
 import { isNativeApp } from '@/lib/safeArea'
+import { MotionFeatures } from '@/providers/motion'
 import UpdateSheet from './UpdateSheet'
 
 /** 模拟状态栏：44px，左「9:41」，右信号/WiFi/电池线性图标，融于页面背景 */
@@ -68,7 +69,7 @@ function TabBar() {
               <div key="publish" className="relative flex w-16 items-start justify-center">
                 <AnimatePresence>
                   {showTip && (
-                    <motion.div
+                    <m.div
                       initial={{ opacity: 0, y: 6, scale: 0.9 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 4, scale: 0.95 }}
@@ -76,10 +77,10 @@ function TabBar() {
                     >
                       点这里发渔获
                       <span className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-ink" />
-                    </motion.div>
+                    </m.div>
                   )}
                 </AnimatePresence>
-                <motion.button
+                <m.button
                   type="button"
                   aria-label="发布渔获"
                   whileTap={{ scale: 0.92 }}
@@ -88,7 +89,7 @@ function TabBar() {
                   className="absolute -top-3 flex h-14 w-14 items-center justify-center rounded-full bg-olive text-paper-white shadow-[0_8px_24px_rgba(45,30,30,0.12)]"
                 >
                   <Plus size={26} strokeWidth={2.2} />
-                </motion.button>
+                </m.button>
               </div>
             )
           }
@@ -102,13 +103,13 @@ function TabBar() {
               onClick={() => navigate(tab.path)}
               className="flex w-16 items-center justify-center"
             >
-              <motion.span
+              <m.span
                 animate={{ y: active ? -2 : 0 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                 className={active ? 'text-olive' : 'text-ink-40'}
               >
                 <Icon size={24} strokeWidth={active ? 2.4 : 1.8} />
-              </motion.span>
+              </m.span>
             </button>
           )
         })}
@@ -142,28 +143,30 @@ export default function Layout() {
   const [native] = useState(() => isNativeApp())
 
   return (
-    <div
-      className="flex min-h-[100dvh] items-stretch justify-center bg-paper"
-      style={{
-        backgroundImage:
-          "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='24' viewBox='0 0 120 24'%3E%3Cpath d='M0 12 Q15 4 30 12 T60 12 T90 12 T120 12' fill='none' stroke='%232d1e1e' stroke-opacity='0.04' stroke-width='1.5'/%3E%3C/svg%3E\")",
-      }}
-    >
-      <BrandBackdrop />
-      <div className="flex h-[100dvh] w-full max-w-[420px] flex-col relative border-x border-stone-300 bg-paper shadow-[0_0_40px_rgba(45,30,30,0.08)]">
-        {native ? (
-          <div className="shrink-0 bg-paper" style={{ height: 'var(--safe-top)' }} />
-        ) : (
-          <StatusBar />
-        )}
-        <main id="app-scroll" className="flex-1 overflow-y-auto overscroll-contain">
-          <Outlet />
-        </main>
-        {showTabBar && <TabBar />}
+    <MotionFeatures>
+      <div
+        className="flex min-h-[100dvh] items-stretch justify-center bg-paper"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='24' viewBox='0 0 120 24'%3E%3Cpath d='M0 12 Q15 4 30 12 T60 12 T90 12 T120 12' fill='none' stroke='%232d1e1e' stroke-opacity='0.04' stroke-width='1.5'/%3E%3C/svg%3E\")",
+        }}
+      >
+        <BrandBackdrop />
+        <div className="flex h-[100dvh] w-full max-w-[420px] flex-col relative border-x border-stone-300 bg-paper shadow-[0_0_40px_rgba(45,30,30,0.08)]">
+          {native ? (
+            <div className="shrink-0 bg-paper" style={{ height: 'var(--safe-top)' }} />
+          ) : (
+            <StatusBar />
+          )}
+          <main id="app-scroll" className="flex-1 overflow-y-auto overscroll-contain">
+            <Outlet />
+          </main>
+          {showTabBar && <TabBar />}
+        </div>
+        <div className="hidden md:block flex-1" />
+        {/* APP 版本检查与更新提示（QY-G-003）：仅原生壳内可能弹出，浏览器静默 */}
+        <UpdateSheet />
       </div>
-      <div className="hidden md:block flex-1" />
-      {/* APP 版本检查与更新提示（QY-G-003）：仅原生壳内可能弹出，浏览器静默 */}
-      <UpdateSheet />
-    </div>
+    </MotionFeatures>
   )
 }

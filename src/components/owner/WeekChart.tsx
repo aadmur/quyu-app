@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { WEEK_STATS } from '@/data/owner'
 
 type Metric = 'tickets' | 'income'
@@ -16,7 +16,7 @@ export default function WeekChart() {
   const format = (v: number) => (metric === 'income' ? `¥${v.toLocaleString('zh-CN')}` : String(v))
 
   return (
-    <motion.section
+    <m.section
       initial={{ opacity: 0, y: 16 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
@@ -32,26 +32,26 @@ export default function WeekChart() {
               { key: 'tickets', label: '售票' },
               { key: 'income', label: '收入' },
             ] as const
-          ).map((m) => (
+          ).map((metric_) => (
             <button
-              key={m.key}
+              key={metric_.key}
               type="button"
               onClick={() => {
-                setMetric(m.key)
+                setMetric(metric_.key)
                 setSelected(null)
               }}
               className={`relative h-7 rounded-full px-3 text-[12px] leading-none ${
-                metric === m.key ? 'font-semibold text-paper-white' : 'text-ink-60'
+                metric === metric_.key ? 'font-semibold text-paper-white' : 'text-ink-60'
               }`}
             >
-              {metric === m.key && (
-                <motion.span
+              {metric === metric_.key && (
+                <m.span
                   layoutId="week-metric-pill"
                   className="absolute inset-0 rounded-full bg-olive"
                   transition={{ type: 'spring', stiffness: 400, damping: 32 }}
                 />
               )}
-              <span className="relative z-10">{m.label}</span>
+              <span className="relative z-10">{metric_.label}</span>
             </button>
           ))}
         </div>
@@ -68,7 +68,7 @@ export default function WeekChart() {
             <div key={d.day} className="flex w-10 flex-col items-center gap-1">
               <div className="relative" style={{ height: BAR_AREA, width: 24 }}>
                 {/* 条顶数值（transform 跟随条高，避免布局动画） */}
-                <motion.span
+                <m.span
                   className="pointer-events-none absolute left-1/2 whitespace-nowrap font-num text-[12px] leading-4 text-ink-60"
                   style={{ top: 0, x: '-50%' }}
                   initial={{ y: BAR_AREA - 18, opacity: 0 }}
@@ -76,10 +76,10 @@ export default function WeekChart() {
                   transition={{ type: 'spring', stiffness: 220, damping: 24, delay: i * 0.06 }}
                 >
                   {metric === 'income' ? `${(v / 1000).toFixed(1)}k` : v}
-                </motion.span>
+                </m.span>
                 {/* 点按数值气泡 */}
                 {selected === i && (
-                  <motion.span
+                  <m.span
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 22 }}
@@ -87,9 +87,9 @@ export default function WeekChart() {
                     style={{ x: '-50%' }}
                   >
                     {format(v)}
-                  </motion.span>
+                  </m.span>
                 )}
-                <motion.button
+                <m.button
                   type="button"
                   aria-label={`周${d.day} ${metric === 'tickets' ? '售票' : '收入'} ${format(v)}`}
                   onClick={() => setSelected(selected === i ? null : i)}
@@ -107,6 +107,6 @@ export default function WeekChart() {
           )
         })}
       </div>
-    </motion.section>
+    </m.section>
   )
 }

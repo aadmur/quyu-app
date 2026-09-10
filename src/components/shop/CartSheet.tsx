@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { Minus, Plus, ShoppingCart, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,13 +31,13 @@ export default function CartSheet({ open, items, ordering, onClose, onSetQty, on
     <AnimatePresence>
       {open && (
         <>
-          <motion.button
+          <m.button
             type="button" aria-label="关闭购物车"
             className="fixed inset-0 z-40 bg-ink/35 backdrop-blur-[2px]"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={onClose}
           />
-          <motion.aside
+          <m.aside
             role="dialog" aria-label="购物车"
             className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-md rounded-t-3xl bg-white px-5 pt-3 shadow-float"
             style={{ paddingBottom: "max(var(--safe-bottom, 0px), 32px)" }}
@@ -88,7 +88,7 @@ export default function CartSheet({ open, items, ordering, onClose, onSetQty, on
                 合计{" "}
                 <span className="price-font text-[19px] font-extrabold text-ink">{formatPrice(total)}</span>
               </p>
-              <motion.button
+              <m.button
                 type="button" whileTap={{ scale: 0.95 }} onClick={onCheckout}
                 disabled={items.length === 0 || ordering}
                 className={cn(
@@ -97,9 +97,9 @@ export default function CartSheet({ open, items, ordering, onClose, onSetQty, on
                 )}
               >
                 {ordering ? "下单中…" : "去结算"}
-              </motion.button>
+              </m.button>
             </div>
-          </motion.aside>
+          </m.aside>
         </>
       )}
     </AnimatePresence>

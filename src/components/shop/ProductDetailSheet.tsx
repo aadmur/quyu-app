@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { X, Star, ShieldCheck, Truck, RotateCcw } from 'lucide-react'
 import type { Product } from '@/data/shop'
 
@@ -37,7 +37,7 @@ export default function ProductDetailSheet({ product, onClose, onAddToCart, onBu
     <AnimatePresence>
       {product && (
         <>
-          <motion.div
+          <m.div
             key="mask"
             className="fixed inset-0 z-40 mx-auto max-w-[420px] bg-ink"
             initial={{ opacity: 0 }}
@@ -46,7 +46,7 @@ export default function ProductDetailSheet({ product, onClose, onAddToCart, onBu
             transition={{ duration: 0.25 }}
             onClick={onClose}
           />
-          <motion.div
+          <m.div
             key="sheet"
             className="fixed inset-x-0 bottom-0 z-40 mx-auto flex h-[92dvh] w-full max-w-[420px] flex-col overflow-hidden rounded-t-[20px] bg-paper-white"
             initial={{ y: '100%' }}
@@ -70,7 +70,7 @@ export default function ProductDetailSheet({ product, onClose, onAddToCart, onBu
             {/* 内容滚动区 */}
             <div className="flex-1 overflow-y-auto overscroll-contain">
               {/* 商品大图：1:1 横滑 2 张 + 分页点 */}
-              <motion.div variants={stagger} initial="hidden" animate="show" custom={0}>
+              <m.div variants={stagger} initial="hidden" animate="show" custom={0}>
                 <div
                   ref={pagerRef}
                   className="no-scrollbar flex aspect-square w-full snap-x snap-mandatory overflow-x-auto"
@@ -94,20 +94,20 @@ export default function ProductDetailSheet({ product, onClose, onAddToCart, onBu
                     />
                   ))}
                 </div>
-              </motion.div>
+              </m.div>
 
               <div className="px-4 pb-6 pt-3">
                 {/* 价格行 */}
-                <motion.div variants={stagger} initial="hidden" animate="show" custom={1} className="flex items-center gap-2">
+                <m.div variants={stagger} initial="hidden" animate="show" custom={1} className="flex items-center gap-2">
                   <span className="font-num text-[32px] leading-9 text-clay">¥{product.price}</span>
                   <span className="text-[13px] leading-[18px] text-ink-40 line-through">¥{product.originalPrice}</span>
                   <span className="rounded-full bg-clay/10 px-2.5 py-1 text-[12px] leading-4 text-clay">
                     直降 ¥{product.originalPrice - product.price}
                   </span>
-                </motion.div>
+                </m.div>
 
                 {/* 商品名 */}
-                <motion.h2
+                <m.h2
                   variants={stagger}
                   initial="hidden"
                   animate="show"
@@ -115,10 +115,10 @@ export default function ProductDetailSheet({ product, onClose, onAddToCart, onBu
                   className="mt-2 text-[18px] font-semibold leading-6 text-ink"
                 >
                   {product.fullName}
-                </motion.h2>
+                </m.h2>
 
                 {/* 服务行 */}
-                <motion.div
+                <m.div
                   variants={stagger}
                   initial="hidden"
                   animate="show"
@@ -136,15 +136,15 @@ export default function ProductDetailSheet({ product, onClose, onAddToCart, onBu
                     <Truck size={14} strokeWidth={1.8} />
                     48 小时发货
                   </span>
-                </motion.div>
+                </m.div>
 
                 {/* 规格选择 */}
                 {product.specs && (
-                  <motion.div variants={stagger} initial="hidden" animate="show" custom={4} className="mt-4">
+                  <m.div variants={stagger} initial="hidden" animate="show" custom={4} className="mt-4">
                     <p className="mb-2 text-[13px] font-semibold leading-[18px] text-ink">长度</p>
                     <div className="flex gap-2">
                       {product.specs.map((s, i) => (
-                        <motion.button
+                        <m.button
                           key={s}
                           type="button"
                           whileTap={{ scale: 0.94 }}
@@ -156,15 +156,15 @@ export default function ProductDetailSheet({ product, onClose, onAddToCart, onBu
                           }`}
                         >
                           {s}
-                        </motion.button>
+                        </m.button>
                       ))}
                     </div>
-                  </motion.div>
+                  </m.div>
                 )}
 
                 {/* 评价预览 */}
                 {product.review && (
-                  <motion.div
+                  <m.div
                     variants={stagger}
                     initial="hidden"
                     animate="show"
@@ -181,7 +181,7 @@ export default function ProductDetailSheet({ product, onClose, onAddToCart, onBu
                       </span>
                     </div>
                     <p className="mt-2 text-[13px] leading-[18px] text-ink-60">「{product.review.text}」</p>
-                  </motion.div>
+                  </m.div>
                 )}
               </div>
             </div>
@@ -191,24 +191,24 @@ export default function ProductDetailSheet({ product, onClose, onAddToCart, onBu
               className="flex min-h-16 shrink-0 items-center gap-2.5 border-t border-line bg-paper-white px-4"
               style={{ paddingBottom: 'max(var(--safe-bottom, 0px), 0px)' }}
             >
-              <motion.button
+              <m.button
                 type="button"
                 whileTap={{ scale: 0.97 }}
                 onClick={handleAdd}
                 className="h-12 flex-1 rounded-xl border border-olive text-[15px] font-semibold text-olive"
               >
                 加入购物车
-              </motion.button>
-              <motion.button
+              </m.button>
+              <m.button
                 type="button"
                 whileTap={{ scale: 0.97 }}
                 onClick={onBuyNow}
                 className="h-12 flex-1 rounded-xl bg-olive text-[15px] font-semibold text-paper-white"
               >
                 立即购买
-              </motion.button>
+              </m.button>
             </div>
-          </motion.div>
+          </m.div>
         </>
       )}
     </AnimatePresence>

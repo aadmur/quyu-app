@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import PageHeader from '@/components/trade/PageHeader'
 import Toast from '@/components/community/Toast'
@@ -106,7 +106,7 @@ export default function FollowList() {
                 {label}
               </span>
               {active && (
-                <motion.span
+                <m.span
                   layoutId="follow-list-tab-indicator"
                   transition={{ type: 'spring', stiffness: 400, damping: 32 }}
                   className="absolute bottom-0 h-0.5 w-10 rounded-full bg-ink"
@@ -146,7 +146,7 @@ export default function FollowList() {
         </div>
       ) : items.length === 0 ? (
         /* 空态 */
-        <motion.div
+        <m.div
           key={`empty-${tab}`}
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -155,14 +155,14 @@ export default function FollowList() {
         >
           <img src="/empty-creel.svg" alt="" className="h-40 w-[200px]" />
           <p className="mt-4 text-[15px] leading-[22px] text-ink-60">{emptyText}</p>
-        </motion.div>
+        </m.div>
       ) : (
         <div>
           {items.map((item, i) => {
             const following = overrides[item.id] ?? item.isFollowingBack
             const isSelf = user.id === item.id
             return (
-              <motion.div
+              <m.div
                 key={item.id}
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -178,7 +178,7 @@ export default function FollowList() {
                   {item.name}
                 </span>
                 {!isSelf && (
-                  <motion.button
+                  <m.button
                     type="button"
                     whileTap={{ scale: 0.95 }}
                     disabled={followMut.isPending}
@@ -190,9 +190,9 @@ export default function FollowList() {
                     }`}
                   >
                     {following ? '已关注' : '关注'}
-                  </motion.button>
+                  </m.button>
                 )}
-              </motion.div>
+              </m.div>
             )
           })}
         </div>

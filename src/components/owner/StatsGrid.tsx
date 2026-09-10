@@ -1,5 +1,5 @@
 import { memo, useEffect } from 'react'
-import { animate, motion, useMotionValue, useTransform } from 'framer-motion'
+import { animate, m, useMotionValue, useTransform } from 'framer-motion'
 import { TODAY_STATS } from '@/data/owner'
 import type { TodayStat } from '@/data/owner'
 
@@ -18,13 +18,13 @@ function StatNumber({ stat, index, override }: { stat: TodayStat; index: number;
     return () => controls.stop()
   }, [mv, value, index])
 
-  return <motion.span className="font-num text-[32px] leading-9 text-ink">{text}</motion.span>
+  return <m.span className="font-num text-[32px] leading-9 text-ink">{text}</m.span>
 }
 
 /** 「在钓人数」实时呼吸圆点（隔离的 perpetual 动画微组件） */
 const LiveDot = memo(function LiveDot() {
   return (
-    <motion.span
+    <m.span
       className="inline-block h-2 w-2 rounded-full bg-lake"
       animate={{ scale: [1, 1.4, 1] }}
       transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}

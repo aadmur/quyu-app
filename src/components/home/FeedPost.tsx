@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { MoreHorizontal, MessageCircle, Send, Bookmark, MapPin, ChevronRight, Link2 } from 'lucide-react'
 import FishIcon from '@/components/FishIcon'
@@ -137,7 +137,7 @@ export default function FeedPost({ post, index, onCollect }: FeedPostProps) {
   const tags = useMemo(() => post.caption.split(/(\s+)/g), [post.caption])
 
   return (
-    <motion.article
+    <m.article
       ref={articleRef}
       initial={{ opacity: 0, y: 24 }}
       whileInView={{ opacity: 1, y: 0 }}
@@ -175,7 +175,7 @@ export default function FeedPost({ post, index, onCollect }: FeedPostProps) {
                   className="fixed inset-0 z-30 cursor-default"
                   onClick={() => setMenuOpen(false)}
                 />
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, scale: 0.95, y: -4 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95, y: -4 }}
@@ -190,7 +190,7 @@ export default function FeedPost({ post, index, onCollect }: FeedPostProps) {
                     <Link2 size={16} strokeWidth={1.8} className="text-ink-60" />
                     复制链接
                   </button>
-                </motion.div>
+                </m.div>
               </>
             )}
           </AnimatePresence>
@@ -207,7 +207,7 @@ export default function FeedPost({ post, index, onCollect }: FeedPostProps) {
           }}
         >
           {post.images.map((src, i) => (
-            <motion.img
+            <m.img
               key={src}
               src={src}
               alt={`${post.author} 的渔获 ${i + 1}`}
@@ -225,7 +225,7 @@ export default function FeedPost({ post, index, onCollect }: FeedPostProps) {
         {/* 双击爆出实心鱼 */}
         <AnimatePresence>
           {burstKey > 0 && (
-            <motion.div
+            <m.div
               key={burstKey}
               className="pointer-events-none absolute inset-0 flex items-center justify-center text-heart"
               initial={{ opacity: 1, scale: 0, rotate: -12 }}
@@ -234,7 +234,7 @@ export default function FeedPost({ post, index, onCollect }: FeedPostProps) {
               transition={{ duration: 0.8, times: [0, 0.6, 1], ease: 'easeOut' }}
             >
               <FishIcon active size={96} />
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
 
@@ -253,7 +253,7 @@ export default function FeedPost({ post, index, onCollect }: FeedPostProps) {
 
       {/* 3. 操作栏 */}
       <div className="flex h-11 items-center gap-4 px-3">
-        <motion.button
+        <m.button
           type="button"
           aria-label="点赞"
           onClick={toggleLike}
@@ -262,14 +262,14 @@ export default function FeedPost({ post, index, onCollect }: FeedPostProps) {
           className={liked ? 'text-heart' : 'text-ink'}
         >
           <FishIcon active={liked} size={24} />
-        </motion.button>
+        </m.button>
         <button type="button" aria-label="评论" onClick={() => setShowComments(true)} className="text-ink">
           <MessageCircle size={24} strokeWidth={1.8} />
         </button>
         <button type="button" aria-label="分享" onClick={sharePost} className="text-ink">
           <Send size={24} strokeWidth={1.8} />
         </button>
-        <motion.button
+        <m.button
           type="button"
           aria-label="收藏"
           className={`ml-auto ${collected ? 'text-olive' : 'text-ink'}`}
@@ -285,12 +285,12 @@ export default function FeedPost({ post, index, onCollect }: FeedPostProps) {
           }}
         >
           <Bookmark size={24} strokeWidth={1.8} fill={collected ? 'currentColor' : 'none'} />
-        </motion.button>
+        </m.button>
       </div>
 
       {/* 4. 点赞数 */}
       <p className="px-3 text-[15px] font-semibold leading-[22px] text-ink">
-        <motion.span
+        <m.span
           key={likeCount}
           initial={{ y: 6, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -298,7 +298,7 @@ export default function FeedPost({ post, index, onCollect }: FeedPostProps) {
           className="font-num text-[17px]"
         >
           {formatNum(likeCount)}
-        </motion.span>{' '}
+        </m.span>{' '}
         次点赞
       </p>
 
@@ -374,6 +374,6 @@ export default function FeedPost({ post, index, onCollect }: FeedPostProps) {
 
       {loginSheet}
       <Toast message={toast} />
-    </motion.article>
+    </m.article>
   )
 }

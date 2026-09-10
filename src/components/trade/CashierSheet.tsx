@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { X, Loader2 } from 'lucide-react'
 import { formatMoney } from '@/data/orders'
 
@@ -24,14 +24,14 @@ export default function CashierSheet({ amount, summary, onPaid, onClose }: Cashi
 
   return (
     <>
-      <motion.div
+      <m.div
         className="fixed inset-0 z-40 bg-ink"
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.4 }}
         exit={{ opacity: 0 }}
         onClick={() => !paying && onClose()}
       />
-      <motion.div
+      <m.div
         className="fixed inset-x-0 bottom-0 z-40 mx-auto flex max-w-[420px] flex-col bg-paper-white"
         style={{ top: 'max(var(--safe-top, 0px), 44px)' }}
         initial={{ y: '100%' }}
@@ -55,14 +55,14 @@ export default function CashierSheet({ amount, summary, onPaid, onClose }: Cashi
 
         {/* 金额巨字 */}
         <div className="flex shrink-0 flex-col items-center gap-1 px-6 pb-6 pt-8">
-          <motion.p
+          <m.p
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.3, delay: 0.15, ease: 'easeOut' }}
             className="font-num text-[56px] leading-[56px] text-ink"
           >
             ¥{formatMoney(amount)}
-          </motion.p>
+          </m.p>
           <p className="text-[12px] leading-4 text-ink-60">{summary}</p>
         </div>
 
@@ -81,7 +81,7 @@ export default function CashierSheet({ amount, summary, onPaid, onClose }: Cashi
           className="shrink-0 border-t border-line px-4 pt-3"
           style={{ paddingBottom: 'max(var(--safe-bottom, 0px), 16px)' }}
         >
-          <motion.button
+          <m.button
             type="button"
             whileTap={{ scale: 0.97 }}
             onClick={pay}
@@ -90,9 +90,9 @@ export default function CashierSheet({ amount, summary, onPaid, onClose }: Cashi
           >
             {paying && <Loader2 size={18} strokeWidth={2} className="animate-spin" />}
             {paying ? '下单中…' : `确认下单 ¥${formatMoney(amount)}`}
-          </motion.button>
+          </m.button>
         </div>
-      </motion.div>
+      </m.div>
     </>
   )
 }

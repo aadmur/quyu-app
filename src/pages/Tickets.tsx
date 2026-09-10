@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import PageHeader from '@/components/trade/PageHeader'
 import Toast from '@/components/trade/Toast'
@@ -36,7 +36,7 @@ function OrderCard({
     : STATUS_META[order.status]
 
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: 0.08 * index, ease: 'easeOut' }}
@@ -78,7 +78,7 @@ function OrderCard({
           {order.status === 'pending' && (
             <div className="flex items-center gap-2">
               {/* 申请退款：次级样式，不抢「出示核销码」主按钮 */}
-              <motion.button
+              <m.button
                 type="button"
                 whileTap={{ scale: 0.96 }}
                 disabled={refunding}
@@ -86,40 +86,40 @@ function OrderCard({
                 className="flex h-9 items-center rounded-xl border border-line bg-paper-white px-4 text-[13px] leading-[18px] text-ink-60 disabled:opacity-50"
               >
                 申请退款
-              </motion.button>
-              <motion.button
+              </m.button>
+              <m.button
                 type="button"
                 whileTap={{ scale: 0.96 }}
                 onClick={() => onShowCode(order)}
                 className="flex h-9 items-center rounded-xl bg-olive px-4 text-[13px] font-semibold leading-[18px] text-paper-white"
               >
                 出示核销码
-              </motion.button>
+              </m.button>
             </div>
           )}
           {order.status === 'used' && (
-            <motion.button
+            <m.button
               type="button"
               whileTap={{ scale: 0.96 }}
               onClick={() => navigate(`/review/${order.id}`)}
               className="flex h-9 items-center rounded-xl border border-olive bg-paper-white px-4 text-[13px] font-semibold leading-[18px] text-olive"
             >
               去评价
-            </motion.button>
+            </m.button>
           )}
           {order.status === 'done' && (
-            <motion.button
+            <m.button
               type="button"
               whileTap={{ scale: 0.96 }}
               onClick={() => navigate(`/pond/${order.pond.id}`)}
               className="flex h-9 items-center rounded-xl border border-olive bg-paper-white px-4 text-[13px] font-semibold leading-[18px] text-olive"
             >
               再来一单
-            </motion.button>
+            </m.button>
           )}
         </div>
       </div>
-    </motion.div>
+    </m.div>
   )
 }
 
@@ -127,7 +127,7 @@ function OrderCard({
 function EmptyTickets() {
   const navigate = useNavigate()
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
@@ -135,15 +135,15 @@ function EmptyTickets() {
     >
       <img src="/empty-creel.svg" alt="" className="h-40 w-[200px]" />
       <p className="mt-4 text-[15px] leading-[22px] text-ink-60">还没有票券，去钓点逛逛吧</p>
-      <motion.button
+      <m.button
         type="button"
         whileTap={{ scale: 0.97 }}
         onClick={() => navigate('/spots')}
         className="mt-5 flex h-12 w-40 items-center justify-center rounded-xl border border-olive bg-paper-white text-[15px] font-semibold leading-[22px] text-olive"
       >
         找钓点
-      </motion.button>
-    </motion.div>
+      </m.button>
+    </m.div>
   )
 }
 
@@ -274,7 +274,7 @@ export default function Tickets() {
               {STATUS_META[s].tab}
               <span className="font-num text-[16px] leading-5 text-olive">{counts[i]}</span>
               {active && (
-                <motion.span
+                <m.span
                   layoutId="tickets-tab-line"
                   className="absolute bottom-0 left-1/2 h-0.5 w-10 -translate-x-1/2 rounded-full bg-olive"
                   transition={{ type: 'spring', stiffness: 400, damping: 32 }}
@@ -287,7 +287,7 @@ export default function Tickets() {
 
       {/* 订单列表 */}
       <AnimatePresence mode="wait">
-        <motion.div
+        <m.div
           key={tab}
           initial={{ opacity: 0, x: 12 }}
           animate={{ opacity: 1, x: 0 }}
@@ -323,21 +323,21 @@ export default function Tickets() {
               />
             ))
           )}
-        </motion.div>
+        </m.div>
       </AnimatePresence>
 
       {/* 核销码弹层 */}
       <AnimatePresence>
         {codeOrder && (
           <>
-            <motion.div
+            <m.div
               className="fixed inset-0 z-40 bg-ink"
               initial={{ opacity: 0 }}
               animate={{ opacity: 0.4 }}
               exit={{ opacity: 0 }}
               onClick={() => setCodeOrder(null)}
             />
-            <motion.div
+            <m.div
               className="fixed inset-0 z-40 mx-auto flex max-w-[420px] items-center justify-center px-6"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -349,7 +349,7 @@ export default function Tickets() {
                 used={codeOrder.status !== 'pending'}
                 onSimulateUse={() => simulateUse(codeOrder)}
               />
-            </motion.div>
+            </m.div>
           </>
         )}
       </AnimatePresence>

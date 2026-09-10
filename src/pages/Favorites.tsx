@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Heart, Star } from 'lucide-react'
 import PageHeader from '@/components/trade/PageHeader'
@@ -26,7 +26,7 @@ function FavRow({ item, index }: { item: FavPondItem; index: number }) {
   const navigate = useNavigate()
   const rating = item.rating != null && !Number.isNaN(Number(item.rating)) ? Number(item.rating) : null
   return (
-    <motion.button
+    <m.button
       type="button"
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
@@ -57,7 +57,7 @@ function FavRow({ item, index }: { item: FavPondItem; index: number }) {
           )}
         </div>
       </div>
-    </motion.button>
+    </m.button>
   )
 }
 
@@ -65,7 +65,7 @@ function FavRow({ item, index }: { item: FavPondItem; index: number }) {
 function EmptyFavorites() {
   const navigate = useNavigate()
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
@@ -73,15 +73,15 @@ function EmptyFavorites() {
     >
       <img src="/empty-creel.svg" alt="" className="h-40 w-[200px]" />
       <p className="mt-4 text-[15px] leading-[22px] text-ink-60">还没有收藏钓场</p>
-      <motion.button
+      <m.button
         type="button"
         whileTap={{ scale: 0.97 }}
         onClick={() => navigate('/spots')}
         className="mt-5 flex h-12 w-40 items-center justify-center rounded-xl border border-olive bg-paper-white text-[15px] font-semibold leading-[22px] text-olive"
       >
         去钓点逛逛
-      </motion.button>
-    </motion.div>
+      </m.button>
+    </m.div>
   )
 }
 
@@ -116,7 +116,7 @@ export default function Favorites() {
         </div>
       ) : user === null ? (
         /* 未登录空态：引导登录 */
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: 'easeOut' }}
@@ -126,15 +126,15 @@ export default function Favorites() {
             <Heart size={28} strokeWidth={1.8} />
           </span>
           <p className="mt-4 text-[15px] leading-[22px] text-ink-60">登录后查看你收藏的钓场</p>
-          <motion.button
+          <m.button
             type="button"
             whileTap={{ scale: 0.97 }}
             onClick={() => requireAuth('查看我的收藏')}
             className="mt-5 flex h-12 w-40 items-center justify-center rounded-xl bg-olive text-[15px] font-semibold leading-[22px] text-paper-white"
           >
             立即登录
-          </motion.button>
-        </motion.div>
+          </m.button>
+        </m.div>
       ) : items.length === 0 ? (
         <EmptyFavorites />
       ) : (

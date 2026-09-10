@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { Search } from 'lucide-react'
 import { NEWS_FLASH, PONDS } from '@/data/spots'
 import NewsTicker from '@/components/spots/NewsTicker'
@@ -88,13 +88,13 @@ export default function Spots() {
     <div className="pb-2">
       {/* Section 1 — 头部区 */}
       <header className="px-4 pt-2">
-        <motion.div {...stagger(0)}>
+        <m.div {...stagger(0)}>
           <h1 className="text-[22px] font-bold leading-7 text-ink">找钓点</h1>
           <p className="mt-0.5 text-[13px] leading-[18px] text-ink-60">武汉 · 周边 50km 内 27 家钓场</p>
-        </motion.div>
+        </m.div>
 
         {/* 搜索框 */}
-        <motion.label
+        <m.label
           {...stagger(1)}
           className="mt-3 flex h-11 items-center gap-2 rounded-xl border bg-paper-white px-3 transition-colors duration-200"
           style={{ borderColor: focused ? '#716a4b' : '#2d1e1e14' }}
@@ -108,10 +108,10 @@ export default function Spots() {
             placeholder="搜钓场、鱼种、钓法"
             className="h-full min-w-0 flex-1 bg-transparent text-[15px] leading-[22px] text-ink outline-none placeholder:text-ink-40"
           />
-        </motion.label>
+        </m.label>
 
         {/* 筛选胶囊横滑 */}
-        <motion.div {...stagger(2)} className="no-scrollbar -mx-4 mt-3 flex h-10 gap-2 overflow-x-auto px-4">
+        <m.div {...stagger(2)} className="no-scrollbar -mx-4 mt-3 flex h-10 gap-2 overflow-x-auto px-4">
           {FILTERS.map((f) => {
             const active = filter === f.key
             return (
@@ -124,7 +124,7 @@ export default function Spots() {
                 }`}
               >
                 {active && (
-                  <motion.span
+                  <m.span
                     layoutId="spots-filter-pill"
                     transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                     className="absolute inset-0 rounded-full bg-olive"
@@ -134,7 +134,7 @@ export default function Spots() {
               </button>
             )
           })}
-        </motion.div>
+        </m.div>
       </header>
 
       {/* Section 2 — 鱼讯快报条 */}
@@ -158,7 +158,7 @@ export default function Spots() {
         </AnimatePresence>
 
         {!loading && ponds.length === 0 && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, ease: 'easeOut' }}
@@ -178,7 +178,7 @@ export default function Spots() {
             >
               看看全部钓场
             </button>
-          </motion.div>
+          </m.div>
         )}
       </div>
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 
 interface ManualCodeSheetProps {
   open: boolean
@@ -58,7 +58,7 @@ export default function ManualCodeSheet({ open, onClose, verify, onSuccess }: Ma
     <AnimatePresence>
       {open && (
         <>
-          <motion.div
+          <m.div
             key="mask"
             className="fixed inset-0 z-50 mx-auto max-w-[420px] bg-ink"
             initial={{ opacity: 0 }}
@@ -67,7 +67,7 @@ export default function ManualCodeSheet({ open, onClose, verify, onSuccess }: Ma
             transition={{ duration: 0.25 }}
             onClick={onClose}
           />
-          <motion.div
+          <m.div
             key="sheet"
             className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-[420px] rounded-t-[20px] bg-paper-white px-6 pt-4"
             style={{ paddingBottom: 'max(var(--safe-bottom, 0px), 40px)' }}
@@ -91,7 +91,7 @@ export default function ManualCodeSheet({ open, onClose, verify, onSuccess }: Ma
                 className="absolute inset-0 h-full w-full opacity-0"
                 aria-label="6 位核销码"
               />
-              <motion.div
+              <m.div
                 key={shakeKey}
                 className="flex justify-between gap-2 px-2"
                 animate={shakeKey > 0 && error ? { x: [0, -8, 8, -6, 6, 0] } : { x: 0 }}
@@ -110,13 +110,13 @@ export default function ManualCodeSheet({ open, onClose, verify, onSuccess }: Ma
                     </span>
                   </div>
                 ))}
-              </motion.div>
+              </m.div>
             </div>
 
             <div className="mt-3 h-5 text-center">
               {error && <p className="text-[13px] leading-[18px] text-clay">核销码无效，请核对后重试</p>}
             </div>
-          </motion.div>
+          </m.div>
         </>
       )}
     </AnimatePresence>

@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import type { Order } from '@/data/orders'
 
 interface QRCodeCardProps {
@@ -36,7 +36,7 @@ export default function QRCodeCard({ order, used, onSimulateUse }: QRCodeCardPro
         />
         <AnimatePresence>
           {used && (
-            <motion.div
+            <m.div
               initial={{ scale: 2, opacity: 0 }}
               animate={{ scale: 1, opacity: 0.9 }}
               exit={{ scale: 2, opacity: 0 }}
@@ -49,7 +49,7 @@ export default function QRCodeCard({ order, used, onSimulateUse }: QRCodeCardPro
               >
                 <span className="text-[20px] font-bold leading-6 text-clay">已核销</span>
               </div>
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
       </div>

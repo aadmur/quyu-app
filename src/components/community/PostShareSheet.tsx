@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { ImageDown, Link2, Share2 } from 'lucide-react'
 
 interface PostShareSheetProps {
@@ -91,7 +91,7 @@ export default function PostShareSheet({ open, post, onClose, onAction, onMakeCa
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 0.4 }}
             exit={{ opacity: 0 }}
@@ -99,7 +99,7 @@ export default function PostShareSheet({ open, post, onClose, onAction, onMakeCa
             className="absolute inset-0 bg-ink"
             onClick={onClose}
           />
-          <motion.div
+          <m.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
@@ -130,7 +130,7 @@ export default function PostShareSheet({ open, post, onClose, onAction, onMakeCa
             >
               取消
             </button>
-          </motion.div>
+          </m.div>
         </div>
       )}
     </AnimatePresence>

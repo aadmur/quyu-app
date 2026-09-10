@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, MessageCircle, Send, MapPin, ChevronRight, Loader2, Pencil, Trash2, X, Flag } from 'lucide-react'
 import FishIcon from '@/components/FishIcon'
 import { trpc } from '@/providers/trpc'
@@ -361,7 +361,7 @@ export default function PostDetail() {
         </div>
         {/* 关注按钮（QY-COMM-005）：作者是自己时不显示 */}
         {!isAuthor && post.authorId != null && (
-          <motion.button
+          <m.button
             type="button"
             whileTap={{ scale: 0.95 }}
             onClick={onToggleFollow}
@@ -371,7 +371,7 @@ export default function PostDetail() {
             }`}
           >
             {following ? '已关注' : '关注'}
-          </motion.button>
+          </m.button>
         )}
       </div>
 
@@ -396,7 +396,7 @@ export default function PostDetail() {
         </div>
         <AnimatePresence>
           {burstKey > 0 && (
-            <motion.div
+            <m.div
               key={burstKey}
               className="pointer-events-none absolute inset-0 flex items-center justify-center text-heart"
               initial={{ opacity: 1, scale: 0, rotate: -12 }}
@@ -405,7 +405,7 @@ export default function PostDetail() {
               transition={{ duration: 0.8, times: [0, 0.6, 1], ease: 'easeOut' }}
             >
               <FishIcon active size={96} />
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
         {post.images.length > 1 && (
@@ -419,7 +419,7 @@ export default function PostDetail() {
 
       {/* 操作栏 */}
       <div className="flex h-12 items-center gap-4 px-3">
-        <motion.button
+        <m.button
           type="button"
           aria-label="点赞"
           onClick={toggleLike}
@@ -428,7 +428,7 @@ export default function PostDetail() {
           className={liked ? 'text-heart' : 'text-ink'}
         >
           <FishIcon active={liked} size={26} />
-        </motion.button>
+        </m.button>
         <button
           type="button"
           aria-label="评论"
@@ -632,7 +632,7 @@ export default function PostDetail() {
       <AnimatePresence>
         {reportOpen && (
           <>
-            <motion.button
+            <m.button
               type="button"
               aria-label="关闭举报"
               className="fixed inset-0 z-[60] bg-ink/35"
@@ -641,7 +641,7 @@ export default function PostDetail() {
               exit={{ opacity: 0 }}
               onClick={() => setReportOpen(false)}
             />
-            <motion.div
+            <m.div
               role="dialog"
               aria-label="举报帖子"
               className="fixed inset-x-0 bottom-0 z-[70] mx-auto max-w-md rounded-t-[20px] bg-paper px-5 pt-3"
@@ -684,7 +684,7 @@ export default function PostDetail() {
               >
                 {reportMut.isPending ? <Loader2 size={17} className="animate-spin" /> : '提交举报'}
               </button>
-            </motion.div>
+            </m.div>
           </>
         )}
       </AnimatePresence>

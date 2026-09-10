@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { motion, AnimatePresence, animate, useMotionValue, useTransform } from 'framer-motion'
+import { m, AnimatePresence, animate, useMotionValue, useTransform } from 'framer-motion'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Minus, Plus, X } from 'lucide-react'
 import PageHeader from '@/components/trade/PageHeader'
@@ -88,14 +88,14 @@ function RollingMoney({ value, className }: { value: number; className?: string 
     const controls = animate(mv, value, { duration: 0.3, ease: 'easeOut' })
     return () => controls.stop()
   }, [value, mv])
-  return <motion.span className={className}>{text}</motion.span>
+  return <m.span className={className}>{text}</m.span>
 }
 
 /** 支付成功全屏页：对勾描边动画 + 彩带 + 二维码缩略卡 + 双按钮 */
 function PaySuccess({ order, seatNos }: { order: Order; seatNos: number[] }) {
   const navigate = useNavigate()
   return (
-    <motion.div
+    <m.div
       className="relative flex flex-col items-center bg-paper px-8 pt-16"
       style={{
         minHeight: 'calc(100dvh - max(var(--safe-top, 0px), 44px))',
@@ -106,25 +106,25 @@ function PaySuccess({ order, seatNos }: { order: Order; seatNos: number[] }) {
     >
       <Confetti />
       <SuccessCheck size={96} />
-      <motion.h2
+      <m.h2
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.3, ease: 'easeOut' }}
         className="mt-5 text-[28px] font-bold leading-[34px] text-ink"
       >
         支付成功
-      </motion.h2>
-      <motion.p
+      </m.h2>
+      <m.p
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.38, ease: 'easeOut' }}
         className="mt-1 text-[13px] leading-[18px] text-ink-60"
       >
         核销码已生成，钓场入口出示即可
-      </motion.p>
+      </m.p>
 
       {/* 二维码缩略卡 */}
-      <motion.div
+      <m.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.5, ease: 'easeOut' }}
@@ -138,33 +138,33 @@ function PaySuccess({ order, seatNos }: { order: Order; seatNos: number[] }) {
           {order.pond.name} · {order.ticketName} × {order.qty}
           {seatNos.length > 0 ? ` · ${seatNos.join('、')} 号位` : ''}
         </p>
-      </motion.div>
+      </m.div>
 
       {/* 双按钮 */}
-      <motion.div
+      <m.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.7, ease: 'easeOut' }}
         className="mt-auto flex w-full flex-col gap-3 pt-10"
       >
-        <motion.button
+        <m.button
           type="button"
           whileTap={{ scale: 0.97 }}
           onClick={() => navigate('/tickets')}
           className="flex h-12 w-full items-center justify-center rounded-xl bg-olive text-[15px] font-semibold leading-[22px] text-paper-white"
         >
           查看我的票券
-        </motion.button>
-        <motion.button
+        </m.button>
+        <m.button
           type="button"
           whileTap={{ scale: 0.97 }}
           onClick={() => navigate('/')}
           className="flex h-12 w-full items-center justify-center rounded-xl border border-olive bg-paper-white text-[15px] font-semibold leading-[22px] text-olive"
         >
           返回首页
-        </motion.button>
-      </motion.div>
-    </motion.div>
+        </m.button>
+      </m.div>
+    </m.div>
   )
 }
 
@@ -391,7 +391,7 @@ export default function Checkout() {
       <Toast message={toast} show={!!toast} />
 
       {/* 钓场摘要条 */}
-      <motion.div
+      <m.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: 'easeOut' }}
@@ -404,7 +404,7 @@ export default function Checkout() {
             {ticket ? `${ticket.name} · ${ticket.durationDesc ?? ''}` : '暂无可售票种'}
           </p>
         </div>
-      </motion.div>
+      </m.div>
 
       {/* 步骤一 · 选择日期 */}
       <section className="mb-6">
@@ -415,7 +415,7 @@ export default function Checkout() {
           {days.map((d, i) => {
             const active = d.key === visitDate
             return (
-              <motion.button
+              <m.button
                 key={d.key}
                 type="button"
                 initial={{ opacity: 0, y: 12 }}
@@ -428,7 +428,7 @@ export default function Checkout() {
                 style={{ scale: active ? 1.05 : 1 }}
               >
                 {active && (
-                  <motion.span
+                  <m.span
                     layoutId="date-pill"
                     className="absolute inset-0 rounded-xl bg-olive"
                     transition={{ type: 'spring', stiffness: 400, damping: 32 }}
@@ -439,7 +439,7 @@ export default function Checkout() {
                   {d.weekday}
                 </span>
                 <span className="relative font-num text-[20px] leading-6">{d.label}</span>
-              </motion.button>
+              </m.button>
             )
           })}
         </div>
@@ -457,7 +457,7 @@ export default function Checkout() {
             {tickets.map((t, i) => {
               const active = String(t.id) === ticketId
               return (
-                <motion.button
+                <m.button
                   key={t.id}
                   type="button"
                   initial={{ opacity: 0, y: 12 }}
@@ -474,7 +474,7 @@ export default function Checkout() {
                     <span className="font-num text-[20px] leading-6 text-clay">¥{t.price}</span>
                   </div>
                   <p className="mt-1 text-[12px] leading-4 text-ink-60">{t.durationDesc ?? ''}</p>
-                </motion.button>
+                </m.button>
               )
             })}
           </div>
@@ -488,7 +488,7 @@ export default function Checkout() {
           title="选择数量"
           extra={
             <div className="flex items-center gap-3">
-              <motion.button
+              <m.button
                 type="button"
                 aria-label="减少数量"
                 whileTap={{ scale: 0.9 }}
@@ -499,8 +499,8 @@ export default function Checkout() {
                 }`}
               >
                 <Minus size={18} strokeWidth={1.8} />
-              </motion.button>
-              <motion.span
+              </m.button>
+              <m.span
                 key={qty}
                 initial={{ scale: 1.2 }}
                 animate={{ scale: 1 }}
@@ -508,8 +508,8 @@ export default function Checkout() {
                 className="w-6 text-center font-num text-[20px] leading-6 text-ink"
               >
                 {qty}
-              </motion.span>
-              <motion.button
+              </m.span>
+              <m.button
                 type="button"
                 aria-label="增加数量"
                 whileTap={{ scale: 0.9 }}
@@ -519,7 +519,7 @@ export default function Checkout() {
                 }`}
               >
                 <Plus size={18} strokeWidth={1.8} />
-              </motion.button>
+              </m.button>
             </div>
           }
         />
@@ -552,7 +552,7 @@ export default function Checkout() {
       </section>
 
       {/* 费用明细 */}
-      <motion.section
+      <m.section
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.15, ease: 'easeOut' }}
@@ -586,7 +586,7 @@ export default function Checkout() {
                   insurance ? 'bg-olive' : 'bg-[#2d1e1e14]'
                 }`}
               >
-                <motion.span
+                <m.span
                   layout="position"
                   transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                   className={`h-5 w-5 rounded-full bg-paper-white ${insurance ? 'ml-auto' : ''}`}
@@ -609,10 +609,10 @@ export default function Checkout() {
           <span className="text-[15px] font-semibold leading-[22px] text-ink">合计</span>
           <RollingMoney value={total} className="font-num text-[32px] leading-9 text-clay" />
         </div>
-      </motion.section>
+      </m.section>
 
       {/* 吸底支付栏 */}
-      <motion.div
+      <m.div
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         transition={{ duration: 0.35, delay: 0.3, ease: 'easeOut' }}
@@ -624,7 +624,7 @@ export default function Checkout() {
             <p className="text-[12px] leading-4 text-ink-60">合计</p>
             <RollingMoney value={total} className="font-num text-[32px] leading-9 text-clay" />
           </div>
-          <motion.button
+          <m.button
             type="button"
             whileTap={{ scale: 0.97 }}
             onClick={goPay}
@@ -632,9 +632,9 @@ export default function Checkout() {
             className="flex h-12 w-40 items-center justify-center rounded-xl bg-olive text-[15px] font-semibold leading-[22px] text-paper-white disabled:opacity-50"
           >
             去支付
-          </motion.button>
+          </m.button>
         </div>
-      </motion.div>
+      </m.div>
 
       {/* 选钓位弹层（真实钓位 + 多选，与数量联动） */}
       <AnimatePresence>
@@ -657,14 +657,14 @@ export default function Checkout() {
       <AnimatePresence>
         {showCouponSheet && (
           <>
-            <motion.div
+            <m.div
               className="fixed inset-0 z-40 bg-ink"
               initial={{ opacity: 0 }}
               animate={{ opacity: 0.4 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowCouponSheet(false)}
             />
-            <motion.div
+            <m.div
               className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-[420px] rounded-t-[20px] bg-paper-white"
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
@@ -711,7 +711,7 @@ export default function Checkout() {
                   )
                 })}
               </div>
-            </motion.div>
+            </m.div>
           </>
         )}
       </AnimatePresence>

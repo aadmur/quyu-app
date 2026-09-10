@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 
 interface ToggleProps {
   checked: boolean
@@ -20,7 +20,7 @@ export default function Toggle({ checked, onChange, label, disabled }: TogglePro
       className="flex h-7 w-12 shrink-0 items-center rounded-full px-1 transition-colors duration-200 disabled:opacity-50"
       style={{ backgroundColor: checked ? '#716a4b' : '#2d1e1e26' }}
     >
-      <motion.span
+      <m.span
         animate={{ x: checked ? 20 : 0 }}
         transition={{ type: 'spring', stiffness: 500, damping: 32 }}
         className="block h-5 w-5 rounded-full bg-paper-white shadow-[0_1px_3px_rgba(45,30,30,0.2)]"

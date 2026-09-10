@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Camera, ChevronRight, Loader2, MapPin, Plus, Scale, X } from 'lucide-react'
 import FishIcon from '@/components/FishIcon'
@@ -135,7 +135,7 @@ export default function Publish() {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-ink/40">
       {/* 底部全屏弹层：y 100%→0，spring damping 28，顶部圆角 20 */}
-      <motion.div
+      <m.div
         initial={{ y: '100%' }}
         animate={{ y: closing ? '100%' : 0 }}
         transition={{ type: 'spring', damping: 28, stiffness: 300 }}
@@ -151,7 +151,7 @@ export default function Publish() {
             取消
           </button>
           <h1 className="text-[18px] font-semibold leading-6 text-ink">发渔获</h1>
-          <motion.button
+          <m.button
             type="button"
             whileTap={ready ? { scale: 0.96 } : undefined}
             disabled={!ready || publishing}
@@ -161,7 +161,7 @@ export default function Publish() {
             }`}
           >
             {publishing ? <Loader2 size={16} className="animate-spin" /> : '发布'}
-          </motion.button>
+          </m.button>
         </header>
 
         <div className="flex-1 overflow-y-auto no-scrollbar">
@@ -170,7 +170,7 @@ export default function Publish() {
             {photos.length > 0 ? (
               <>
                 {/* 主图 */}
-                <motion.div
+                <m.div
                   key={photos[0].slice(0, 64)}
                   initial={{ scale: 0.7, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
@@ -186,11 +186,11 @@ export default function Publish() {
                   >
                     <X size={16} strokeWidth={2} />
                   </button>
-                </motion.div>
+                </m.div>
                 {/* 附图 + 添加 */}
                 <div className="mt-3 flex flex-wrap gap-3">
                   {photos.slice(1).map((src, i) => (
-                    <motion.div
+                    <m.div
                       key={src.slice(0, 64)}
                       initial={{ scale: 0.7, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
@@ -206,7 +206,7 @@ export default function Publish() {
                       >
                         <X size={12} strokeWidth={2.2} />
                       </button>
-                    </motion.div>
+                    </m.div>
                   ))}
                   {photos.length < MAX_PHOTOS && (
                     <button
@@ -246,13 +246,13 @@ export default function Publish() {
           </section>
 
           {/* Section 2 — 渔获信息行（鱼种 / 重量） */}
-          <motion.section
+          <m.section
             initial="hidden"
             animate="show"
             variants={{ show: { transition: { staggerChildren: 0.06 } } }}
             className="mx-4 mb-5 flex gap-3"
           >
-            <motion.button
+            <m.button
               type="button"
               variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
               onClick={() => setSpeciesOpen(true)}
@@ -263,8 +263,8 @@ export default function Publish() {
                 {species ?? '鱼种（必选）'}
               </span>
               <ChevronRight size={18} strokeWidth={1.8} className="text-ink-40" />
-            </motion.button>
-            <motion.div
+            </m.button>
+            <m.div
               variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
               className="flex h-12 w-[120px] items-center gap-1 rounded-xl bg-paper-white px-3"
             >
@@ -277,13 +277,13 @@ export default function Publish() {
                 className="w-full min-w-0 bg-transparent text-right font-num text-[20px] leading-6 text-ink outline-none placeholder:text-ink-40"
               />
               <span className="shrink-0 text-[12px] leading-4 text-ink-60">斤</span>
-            </motion.div>
-          </motion.section>
+            </m.div>
+          </m.section>
 
           {/* Section 3 — 钓点标签 */}
           <section className="mx-4 mb-5">
             {spot ? (
-              <motion.div
+              <m.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 24 }}
@@ -299,7 +299,7 @@ export default function Publish() {
                 >
                   <X size={14} strokeWidth={2.2} />
                 </button>
-              </motion.div>
+              </m.div>
             ) : (
               <button
                 type="button"
@@ -324,7 +324,7 @@ export default function Publish() {
             />
             <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto">
               {PUBLISH_TOPICS.map((topic) => (
-                <motion.button
+                <m.button
                   key={topic}
                   type="button"
                   whileTap={{ scale: 0.92 }}
@@ -332,7 +332,7 @@ export default function Publish() {
                   className="shrink-0 rounded-full bg-olive-tint px-3 py-1 text-[12px] leading-4 text-olive"
                 >
                   {topic}
-                </motion.button>
+                </m.button>
               ))}
             </div>
           </section>
@@ -354,7 +354,7 @@ export default function Publish() {
             </div>
           </section>
         </div>
-      </motion.div>
+      </m.div>
 
       {/* 鱼种 / 钓点选择层 */}
       <SpeciesPicker open={speciesOpen} value={species} onSelect={setSpecies} onClose={() => setSpeciesOpen(false)} />

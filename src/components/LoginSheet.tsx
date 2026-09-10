@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { X, LogIn } from 'lucide-react'
 import { useCallback, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -107,13 +107,13 @@ export default function LoginSheet({ open, actionText = '继续操作', onClose 
     <AnimatePresence>
       {open && (
         <>
-          <motion.button
+          <m.button
             type="button" aria-label="关闭登录引导"
             className="fixed inset-0 z-[60] bg-ink/35"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={onClose}
           />
-          <motion.div
+          <m.div
             role="dialog" aria-label="登录引导"
             className="fixed inset-x-0 bottom-0 z-[70] mx-auto max-w-md rounded-t-[20px] bg-paper px-6 pt-3"
             style={{ paddingBottom: 'max(var(--safe-bottom), 24px)' }}
@@ -202,7 +202,7 @@ export default function LoginSheet({ open, actionText = '继续操作', onClose 
                 先逛逛，稍后再说
               </button>
             </div>
-          </motion.div>
+          </m.div>
         </>
       )}
     </AnimatePresence>

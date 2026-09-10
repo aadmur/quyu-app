@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { X, ChevronUp, MapPin } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { Story } from '@/data/home'
+import BottomSheet from '@/components/home/BottomSheet'
 
 interface StoryPlayerProps {
   story: Story
@@ -37,24 +38,21 @@ export default function StoryPlayer({ story, onClose }: StoryPlayerProps) {
   }, [])
 
   return (
-    <motion.div
+    <m.div
       className="fixed inset-0 z-50 mx-auto max-w-[420px] bg-black"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
     >
-      <motion.div
+      <BottomSheet
+        onClose={onClose}
+        threshold={90}
+        elastic={0.6}
         className="relative h-full w-full overflow-hidden"
-        drag="y"
-        dragConstraints={{ top: 0, bottom: 0 }}
-        dragElastic={{ top: 0, bottom: 0.6 }}
-        onDragEnd={(_, info) => {
-          if (info.offset.y > 90 || info.velocity.y > 500) onClose()
-        }}
       >
         <AnimatePresence mode="wait" initial={false}>
-          <motion.img
+          <m.img
             key={frame}
             src={story.frames[frame]}
             alt={story.name}
@@ -81,7 +79,7 @@ export default function StoryPlayer({ story, onClose }: StoryPlayerProps) {
               <div key={i} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/30">
                 {i < frame && <div className="h-full w-full bg-white" />}
                 {i === frame && (
-                  <motion.div
+                  <m.div
                     key={`progress-${frame}`}
                     className="h-full w-full origin-left bg-white"
                     initial={{ scaleX: 0 }}
@@ -110,7 +108,7 @@ export default function StoryPlayer({ story, onClose }: StoryPlayerProps) {
 
         {/* 官方塘 story：底部「查看钓点 →」上滑入口 */}
         {story.official && story.spotId && (
-          <motion.button
+          <m.button
             type="button"
             onClick={() => navigate(`/pond/${story.spotId}`)}
             className="absolute inset-x-4 flex items-center justify-center gap-1.5 rounded-xl bg-paper-white/95 py-3 text-[14px] font-semibold text-olive"
@@ -121,9 +119,9 @@ export default function StoryPlayer({ story, onClose }: StoryPlayerProps) {
             <ChevronUp size={18} strokeWidth={2} />
             <MapPin size={16} strokeWidth={1.8} />
             查看钓点
-          </motion.button>
+          </m.button>
         )}
-      </motion.div>
-    </motion.div>
+      </BottomSheet>
+    </m.div>
   )
 }

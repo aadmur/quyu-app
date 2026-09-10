@@ -1,11 +1,11 @@
 import { memo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { X, Keyboard } from 'lucide-react'
 
 /** 扫描线（隔离的 perpetual 动画微组件） */
 const ScanLine = memo(function ScanLine() {
   return (
-    <motion.div
+    <m.div
       className="absolute inset-x-3 h-0.5 rounded-full bg-lake"
       style={{ boxShadow: '0 0 12px #5e7a6e' }}
       animate={{ top: ['8%', '88%', '8%'] }}
@@ -34,7 +34,7 @@ export default function ScanOverlay({ open, onSwitchToManual, onClose }: ScanOve
   return (
     <AnimatePresence>
       {open && (
-        <motion.div
+        <m.div
           className="fixed inset-0 z-50 mx-auto flex max-w-[420px] flex-col items-center bg-black"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -69,15 +69,15 @@ export default function ScanOverlay({ open, onSwitchToManual, onClose }: ScanOve
             当前部署环境未启用相机能力（HTTP 站点/Android WebView 限制）。请让钓友出示 6 位核销码，使用手动输码完成真实核销。
           </p>
 
-          <motion.button
+          <m.button
             type="button"
             whileTap={{ scale: 0.96 }}
             onClick={onSwitchToManual}
             className="mt-auto mb-16 flex h-12 items-center gap-2 rounded-full bg-lake px-6 text-[15px] font-semibold leading-none text-paper-white"
           >
             <Keyboard size={18} strokeWidth={1.8} /> 手动输入核销码
-          </motion.button>
-        </motion.div>
+          </m.button>
+        </m.div>
       )}
     </AnimatePresence>
   )

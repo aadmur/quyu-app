@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { motion, animate, AnimatePresence } from 'framer-motion'
+import { m, animate, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import {
   Settings,
@@ -279,7 +279,7 @@ export default function Profile() {
       {/* Section 1 — 封面 + 资料卡 */}
       <section className="relative">
         <div className="relative h-[140px] overflow-hidden">
-          <motion.img
+          <m.img
             src={coverSrc}
             alt="个人封面"
             initial={{ scale: 1.08 }}
@@ -294,7 +294,7 @@ export default function Profile() {
               { icon: Settings, label: '设置', onTap: openSettings },
               { icon: Share2, label: '分享主页', onTap: shareProfile },
             ].map(({ icon: Icon, label, onTap }) => (
-              <motion.button
+              <m.button
                 key={label}
                 type="button"
                 aria-label={label}
@@ -303,7 +303,7 @@ export default function Profile() {
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-white/40 text-ink backdrop-blur-sm"
               >
                 <Icon size={20} strokeWidth={1.8} />
-              </motion.button>
+              </m.button>
             ))}
           </div>
         </div>
@@ -312,7 +312,7 @@ export default function Profile() {
           {meLoading ? (
             <div className="-mt-8 h-[88px] w-[88px] animate-pulse rounded-full border-2 border-paper-white bg-line" />
           ) : (
-            <motion.img
+            <m.img
               src={displayAvatar}
               alt={displayName}
               initial={{ scale: 0.6, opacity: 0 }}
@@ -321,12 +321,12 @@ export default function Profile() {
               className="-mt-8 h-[88px] w-[88px] rounded-full border-2 border-paper-white object-cover"
             />
           )}
-          <motion.div
+          <m.div
             initial="hidden"
             animate="show"
             variants={{ show: { transition: { staggerChildren: 0.06, delayChildren: 0.2 } } }}
           >
-            <motion.div
+            <m.div
               variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
               className="mt-3 flex items-center gap-2"
             >
@@ -356,19 +356,19 @@ export default function Profile() {
                   <LogIn size={13} /> 登录
                 </button>
               ))}
-            </motion.div>
-            <motion.p
+            </m.div>
+            <m.p
               variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
               className="mt-1 text-[13px] leading-[18px] text-ink-60"
             >
               {bioText}
-            </motion.p>
-            <motion.div
+            </m.p>
+            <m.div
               variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
               className="mt-4 flex"
             >
               {statsRow.map((s) => (
-                <motion.button
+                <m.button
                   key={s.label}
                   type="button"
                   whileTap={{ scale: 0.96 }}
@@ -379,16 +379,16 @@ export default function Profile() {
                     <CountUp value={s.value} />
                   </span>
                   <span className="text-[12px] leading-4 text-ink-60">{s.label}</span>
-                </motion.button>
+                </m.button>
               ))}
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         </div>
       </section>
 
       {/* Section 1b — 注销冷静期状态条（QY-E-005）：仅冷静期内显示 */}
       {deletionRequestedAt && (
-        <motion.section
+        <m.section
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: 'easeOut' }}
@@ -406,7 +406,7 @@ export default function Profile() {
           >
             撤销注销
           </button>
-        </motion.section>
+        </m.section>
       )}
 
       {/* Section 2 — 身份切换胶囊（钓友 / 塘主） */}
@@ -430,7 +430,7 @@ export default function Profile() {
                 className="relative flex flex-1 items-center justify-center"
               >
                 {active && (
-                  <motion.span
+                  <m.span
                     layoutId="role-pill"
                     transition={{ type: 'spring', stiffness: 400, damping: 32 }}
                     className="absolute inset-0 rounded-full border border-line bg-paper-white"
@@ -450,13 +450,13 @@ export default function Profile() {
       </section>
 
       {/* Section 3 — 我的票券横条 */}
-      <motion.section
+      <m.section
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: 'easeOut', delay: 0.25 }}
         className="mx-4 mt-4"
       >
-        <motion.button
+        <m.button
           type="button"
           whileTap={{ scale: 0.98 }}
           onClick={() => navigate('/tickets')}
@@ -471,17 +471,17 @@ export default function Profile() {
           <span className="flex-1" />
           <span className="text-[12px] leading-4 text-ink-60">查看全部</span>
           <ChevronRight size={18} strokeWidth={1.8} className="text-ink-40" />
-        </motion.button>
-      </motion.section>
+        </m.button>
+      </m.section>
 
       {/* Section 3b — 商品订单横条（打开 ProductOrdersSheet，进行中订单数徽章） */}
-      <motion.section
+      <m.section
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: 'easeOut', delay: 0.27 }}
         className="mx-4 mt-3"
       >
-        <motion.button
+        <m.button
           type="button"
           whileTap={{ scale: 0.98 }}
           onClick={() => setProductOrdersOpen(true)}
@@ -500,18 +500,18 @@ export default function Profile() {
           <span className="flex-1" />
           <span className="text-[12px] leading-4 text-ink-60">查看全部</span>
           <ChevronRight size={18} strokeWidth={1.8} className="text-ink-40" />
-        </motion.button>
-      </motion.section>
+        </m.button>
+      </m.section>
 
       {/* Section 3c — 内容审核入口（仅全局 admin 或已绑定塘主可见） */}
       {me?.role === 'admin' && (
-        <motion.section
+        <m.section
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: 'easeOut', delay: 0.275 }}
           className="mx-4 mt-3"
         >
-          <motion.button
+          <m.button
             type="button"
             whileTap={{ scale: 0.98 }}
             onClick={() => navigate('/moderation')}
@@ -524,17 +524,17 @@ export default function Profile() {
             <span className="flex-1" />
             <span className="text-[12px] leading-4 text-ink-60">举报队列</span>
             <ChevronRight size={18} strokeWidth={1.8} className="text-ink-40" />
-          </motion.button>
-        </motion.section>
+          </m.button>
+        </m.section>
       )}
 
-      <motion.section
+      <m.section
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: 'easeOut', delay: 0.28 }}
         className="mx-4 mt-3"
       >
-        <motion.button
+        <m.button
           type="button"
           whileTap={{ scale: 0.98 }}
           onClick={() => setInsightOpen(true)}
@@ -547,18 +547,18 @@ export default function Profile() {
           <span className="text-[12px] leading-4 text-ink-60">看看趣渔有多懂你</span>
           <span className="flex-1" />
           <ChevronRight size={18} strokeWidth={1.8} className="text-ink-40" />
-        </motion.button>
-      </motion.section>
+        </m.button>
+      </m.section>
 
       {/* Section 4 — 服务入口宫格 */}
-      <motion.section
+      <m.section
         initial="hidden"
         animate="show"
         variants={{ show: { transition: { staggerChildren: 0.05, delayChildren: 0.3 } } }}
         className="mx-4 mb-6 mt-4 grid grid-cols-4"
       >
         {SERVICE_ENTRIES.map(({ key, label, icon: Icon, path }) => (
-          <motion.button
+          <m.button
             key={key}
             type="button"
             variants={{ hidden: { opacity: 0, scale: 0.8 }, show: { opacity: 1, scale: 1 } }}
@@ -568,9 +568,9 @@ export default function Profile() {
           >
             <Icon size={28} strokeWidth={1.8} className="text-ink" />
             <span className="text-[12px] leading-4 text-ink-60">{label}</span>
-          </motion.button>
+          </m.button>
         ))}
-      </motion.section>
+      </m.section>
 
       {/* Section 5 — 渔获墙 Tab（九宫格 / 鱼获统计） */}
       <section className="border-t border-line">
@@ -592,7 +592,7 @@ export default function Profile() {
               >
                 <Icon size={22} strokeWidth={active ? 2.2 : 1.8} className={active ? 'text-ink' : 'text-ink-40'} />
                 {active && (
-                  <motion.span
+                  <m.span
                     layoutId="wall-tab-indicator"
                     transition={{ type: 'spring', stiffness: 400, damping: 32 }}
                     className="absolute bottom-0 h-0.5 w-10 rounded-full bg-ink"
@@ -605,7 +605,7 @@ export default function Profile() {
 
         <AnimatePresence mode="wait">
           {wallTab === 'grid' ? (
-            <motion.div
+            <m.div
               key="grid"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -616,18 +616,18 @@ export default function Profile() {
               {wallItems.length === 0 ? (
                 <div className="col-span-3 flex flex-col items-center gap-3 bg-paper-white px-4 py-12">
                   <p className="text-[13px] leading-[18px] text-ink-60">还没有渔获，去发布第一条吧</p>
-                  <motion.button
+                  <m.button
                     type="button"
                     whileTap={{ scale: 0.96 }}
                     onClick={() => navigate('/publish')}
                     className="rounded-full bg-olive px-5 py-2 text-[13px] font-semibold leading-[18px] text-paper-white active:brightness-95"
                   >
                     去发布
-                  </motion.button>
+                  </m.button>
                 </div>
               ) : (
                 wallItems.map((item, i) => (
-                  <motion.button
+                  <m.button
                     key={item.id}
                     type="button"
                     initial={{ opacity: 0, scale: 0.9 }}
@@ -647,13 +647,13 @@ export default function Profile() {
                         </span>
                       </span>
                     )}
-                  </motion.button>
+                  </m.button>
                 ))
               )}
-            </motion.div>
+            </m.div>
           ) : (
             /* 鱼获统计 Tab（演示彩蛋）：横向条形图，scaleX 0→1 stagger */
-            <motion.div
+            <m.div
               key="stats"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -670,7 +670,7 @@ export default function Profile() {
                     <div key={s.species} className="flex items-center gap-3">
                       <span className="w-10 shrink-0 text-[13px] leading-[18px] text-ink">{s.species}</span>
                       <div className="h-3 flex-1 overflow-hidden rounded-full bg-[#2d1e1e0d]">
-                        <motion.div
+                        <m.div
                           initial={{ scaleX: 0 }}
                           animate={{ scaleX: s.count / maxCount }}
                           transition={{ delay: i * 0.08, duration: 0.5, ease: 'easeOut' }}
@@ -686,7 +686,7 @@ export default function Profile() {
                   ))}
                 </div>
               )}
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
       </section>
@@ -711,13 +711,13 @@ export default function Profile() {
       <AnimatePresence>
         {settingsOpen && (
           <>
-            <motion.button
+            <m.button
               type="button" aria-label="关闭设置"
               className="fixed inset-0 z-40 bg-ink/35"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setSettingsOpen(false)}
             />
-            <motion.div
+            <m.div
               role="dialog" aria-label="编辑资料"
               className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-md rounded-t-[20px] bg-paper px-5 pt-3"
               style={{ paddingBottom: 'max(var(--safe-bottom, 0px), 40px)' }}
@@ -834,7 +834,7 @@ export default function Profile() {
                   注销账号
                 </button>
               )}
-            </motion.div>
+            </m.div>
           </>
         )}
       </AnimatePresence>
@@ -843,13 +843,13 @@ export default function Profile() {
       <AnimatePresence>
         {deletionOpen && (
           <>
-            <motion.button
+            <m.button
               type="button" aria-label="关闭注销确认"
               className="fixed inset-0 z-[60] bg-ink/35"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setDeletionOpen(false)}
             />
-            <motion.div
+            <m.div
               role="dialog" aria-label="注销账号确认"
               className="fixed inset-x-0 bottom-0 z-[70] mx-auto max-w-md rounded-t-[20px] bg-paper px-5 pt-3"
               style={{ paddingBottom: 'max(var(--safe-bottom, 0px), 40px)' }}
@@ -896,7 +896,7 @@ export default function Profile() {
               >
                 再想想
               </button>
-            </motion.div>
+            </m.div>
           </>
         )}
       </AnimatePresence>
@@ -905,13 +905,13 @@ export default function Profile() {
       <AnimatePresence>
         {helpOpen && (
           <>
-            <motion.button
+            <m.button
               type="button" aria-label="关闭帮助"
               className="fixed inset-0 z-40 bg-ink/35"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setHelpOpen(false)}
             />
-            <motion.div
+            <m.div
               role="dialog" aria-label="帮助中心"
               className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-md rounded-t-[20px] bg-paper px-5 pt-3"
               style={{ paddingBottom: 'max(var(--safe-bottom, 0px), 40px)' }}
@@ -943,7 +943,7 @@ export default function Profile() {
                   <p className="text-ink-60">工作日 9:00–18:00，邮箱 support@quyu.app</p>
                 </div>
               </div>
-            </motion.div>
+            </m.div>
           </>
         )}
       </AnimatePresence>

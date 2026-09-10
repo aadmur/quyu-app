@@ -30,6 +30,38 @@
 }
 
 @layer base {
+  /* 路由切换骨架进度条（QY-PERF-002）：不确定态往返滑动，
+     不表达真实进度，仅提示「正在加载」，避免整屏白闪。 */
+  @keyframes qy-route-progress {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(300%);
+    }
+  }
+  .qy-route-progress {
+    animation: qy-route-progress 1.1s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .qy-route-progress {
+      animation: none;
+      transform: none;
+      width: 100%;
+    }
+  }
+
+  /* 底部抽屉手势（QY-PERF-005）：替代 framer-motion 的 drag="y"，
+     避免为两处拖拽关闭手势引入 domMax 能力包（+39.3 KB brotli）。 */
+  .qy-sheet {
+    touch-action: pan-y; /* 允许纵向滚动，纵向平移由 JS 接管判定 */
+    will-change: transform;
+  }
+  /* 抽屉内部滚动容器：手势起点判定需读取 scrollTop（见 BottomSheet.canStart） */
+  .qy-sheet-scroll {
+    overscroll-behavior: contain;
+  }
+
   :root {
     /* 安全区变量：默认取系统 env()；Capacitor 安卓壳 env 恒 0 时由 initSafeArea() 注入兜底值 */
     --safe-top: env(safe-area-inset-top, 0px);

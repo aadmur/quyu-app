@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { X, Sparkles } from 'lucide-react'
 import { trpc } from '@/providers/trpc'
 import { POND_NAME_BY_SLUG } from '@/lib/live'
@@ -19,7 +19,7 @@ function BarRow({ label, ratio, index }: BarRowProps) {
     <div className="flex items-center gap-3 py-1.5">
       <span className="w-16 shrink-0 truncate text-[13px] leading-[18px] text-ink">{label}</span>
       <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-[#2d1e1e0d]">
-        <motion.div
+        <m.div
           initial={{ scaleX: 0 }}
           animate={{ scaleX: Math.max(ratio, 0.03) }}
           transition={{ delay: 0.15 + index * 0.07, duration: 0.5, ease: 'easeOut' }}
@@ -45,14 +45,14 @@ export default function ProfileInsightSheet({ onClose }: ProfileInsightSheetProp
 
   return (
     <>
-      <motion.div
+      <m.div
         className="fixed inset-0 z-40 bg-black"
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.4 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
       />
-      <motion.div
+      <m.div
         className="fixed inset-x-0 bottom-0 z-40 mx-auto flex max-h-[76dvh] max-w-[420px] flex-col rounded-t-[20px] bg-paper-white shadow-[0_8px_24px_rgba(45,30,30,0.12)]"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
@@ -130,7 +130,7 @@ export default function ProfileInsightSheet({ onClose }: ProfileInsightSheetProp
             </p>
           )}
         </div>
-      </motion.div>
+      </m.div>
     </>
   )
 }

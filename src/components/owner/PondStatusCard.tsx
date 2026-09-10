@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 
 interface PondStatusCardProps {
   open: boolean
@@ -11,7 +11,7 @@ interface PondStatusCardProps {
  */
 export default function PondStatusCard({ open, onToggle }: PondStatusCardProps) {
   return (
-    <motion.section
+    <m.section
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut', delay: 0.05 }}
@@ -37,9 +37,9 @@ export default function PondStatusCard({ open, onToggle }: PondStatusCardProps) 
             open ? 'justify-end bg-lake' : 'justify-start bg-paper-white/25'
           }`}
         >
-          <motion.span layout className="h-5 w-5 rounded-full bg-paper-white" transition={{ type: 'spring', stiffness: 500, damping: 32 }} />
+          <m.span layout className="h-5 w-5 rounded-full bg-paper-white" transition={{ type: 'spring', stiffness: 500, damping: 32 }} />
         </button>
       </div>
-    </motion.section>
+    </m.section>
   )
 }

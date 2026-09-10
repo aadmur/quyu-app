@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Flag, Loader2, MapPin, Phone } from 'lucide-react'
 import { trpc } from '@/providers/trpc'
@@ -118,7 +118,7 @@ function ApplicationsPanel({
   return (
     <ul className="mx-4 mt-2 space-y-3">
       {items.map((a) => (
-        <motion.li
+        <m.li
           key={a.id}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -206,7 +206,7 @@ function ApplicationsPanel({
               </button>
             </div>
           )}
-        </motion.li>
+        </m.li>
       ))}
     </ul>
   )
@@ -264,7 +264,7 @@ export default function Moderation() {
   return (
     <div className="min-h-dvh bg-paper" style={{ paddingBottom: 'max(var(--safe-bottom, 0px), 8px)' }}>
       {/* 顶栏（与塘主工作台同款二级页头部） */}
-      <motion.header
+      <m.header
         className="sticky top-0 z-20 flex h-12 items-center justify-between bg-paper px-2"
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -280,7 +280,7 @@ export default function Moderation() {
         </button>
         <h1 className="text-[18px] font-semibold leading-6 text-ink">审核队列</h1>
         <span className="h-10 w-10" aria-hidden="true" />
-      </motion.header>
+      </m.header>
 
       {/* Tab 切换（QY-D-002）：入驻申请仅全局 admin 可见，塘主只见举报队列 */}
       {isAdmin && (
@@ -300,7 +300,7 @@ export default function Moderation() {
                 className="relative flex flex-1 items-center justify-center"
               >
                 {active && (
-                  <motion.span
+                  <m.span
                     layoutId="moderation-tab"
                     transition={{ type: 'spring', stiffness: 400, damping: 32 }}
                     className="absolute inset-0 rounded-full border border-line bg-paper-white"
@@ -366,7 +366,7 @@ export default function Moderation() {
           {/* 举报卡片列表 */}
           <ul className="mx-4 mt-2 space-y-3">
             {items.map((r) => (
-              <motion.li
+              <m.li
                 key={r.id}
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -429,7 +429,7 @@ export default function Moderation() {
                     {handleMut.isPending ? <Loader2 size={15} className="animate-spin" /> : '下架帖子'}
                   </button>
                 </div>
-              </motion.li>
+              </m.li>
             ))}
           </ul>
         </>
@@ -438,7 +438,7 @@ export default function Moderation() {
       {/* Toast（与 Owner 页同款） */}
       <AnimatePresence>
         {toast && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
@@ -446,7 +446,7 @@ export default function Moderation() {
             className="fixed inset-x-0 bottom-24 z-[70] mx-auto w-fit max-w-[320px] rounded-full bg-ink px-4 py-2 text-center text-[13px] leading-[18px] text-paper"
           >
             {toast}
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>
