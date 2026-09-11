@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
 import { Download } from 'lucide-react'
 import { trpc } from '@/providers/trpc'
@@ -38,9 +38,8 @@ async function getNativeVersion(): Promise<number | null> {
 
 export default function UpdateSheet() {
   const [localVer, setLocalVer] = useState<number | null>(null)
-  const [open, setOpen] = useState(false)
-  // 防止数据回流/重渲染导致关闭后重弹：每次挂载最多主动弹一次
-  const prompted = useRef(false)
+  // 用户是否已关闭提示 / 已点击去更新。每次挂载重置，等价于原先「每会话最多主动弹一次」的语义
+  const [dismissed, setDismissed] = useState(false)
 
   // 原生壳检测 + 本地版本读取：每会话一次；纯浏览器 window.Capacitor 不存在，静默跳过
   useEffect(() => {
@@ -72,22 +71,18 @@ export default function UpdateSheet() {
   const shouldPrompt =
     localVer !== null && Number.isFinite(latest) && latest > localVer
 
-  useEffect(() => {
-    if (shouldPrompt && !prompted.current) {
-      prompted.current = true
-      setOpen(true)
-    }
-  }, [shouldPrompt])
+  // 可见性由数据直接推导（原为 effect 内 setState，会触发级联渲染）
+  const open = shouldPrompt && !dismissed
 
   const force = data?.force === true
   /** 强制更新不给「暂不」，也不允许点遮罩关闭 */
   const close = () => {
-    if (!force) setOpen(false)
+    if (!force) setDismissed(true)
   }
   const goUpdate = () => {
     // 原生壳内 window.open 走系统浏览器打开 APK 下载地址
     if (data?.apkUrl) window.open(data.apkUrl, '_blank')
-    if (!force) setOpen(false)
+    if (!force) setDismissed(true)
   }
 
   return (

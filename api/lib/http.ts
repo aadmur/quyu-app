@@ -1,7 +1,17 @@
-interface RequestConfig extends RequestInit {
+/** 可 JSON 序列化的请求体（替代 any，保留 JSON.stringify 的可用范围） */
+type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+interface RequestConfig extends Omit<RequestInit, "body"> {
   baseUrl?: string;
   params?: Record<string, string | number>;
   timeout?: number;
+  body?: JsonValue;
 }
 
 export class HttpClient {
@@ -41,7 +51,7 @@ export class HttpClient {
         ...rest,
         method,
         headers: { ...this.defaultHeaders, ...headers },
-        body: body ? JSON.stringify(body) : undefined,
+        body: body === undefined ? undefined : JSON.stringify(body),
         signal: controller.signal,
       });
 
@@ -55,8 +65,8 @@ export class HttpClient {
       }
 
       return (await response.json()) as T;
-    } catch (error: any) {
-      if (error.name === "AbortError") {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === "AbortError") {
         throw new Error("Request timeout");
       }
       throw error;
@@ -71,7 +81,7 @@ export class HttpClient {
     return this.request<T>(url, { ...config, method: "GET", params });
   }
 
-  post<T>(url: string, body?: any, config?: RequestConfig) {
+  post<T>(url: string, body?: JsonValue, config?: RequestConfig) {
     return this.request<T>(url, { ...config, method: "POST", body });
   }
 }

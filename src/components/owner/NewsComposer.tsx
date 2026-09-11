@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { m } from 'framer-motion'
 import { NEWS_TEMPLATES } from '@/data/owner'
 import { trpc } from '@/providers/trpc'
@@ -11,14 +11,13 @@ interface NewsComposerProps {
 /** 发布鱼讯快捷区：钓场胶囊选择 + 输入框 + 模板胶囊横滑 + 真实发布到 fish_news（pondSlug 必传） */
 export default function NewsComposer({ onPublished }: NewsComposerProps) {
   const [text, setText] = useState('')
-  const [pondSlug, setPondSlug] = useState('')
+  // 用户手动选择的钓场；未选择时回落到列表第一个（推导，不再用 effect 回写 state）
+  const [selectedSlug, setSelectedSlug] = useState('')
 
   // 钓场列表：pondSlug 必传，默认选中第一个钓场
   const pondsQuery = trpc.app.ponds.list.useQuery(undefined, { retry: 1 })
   const ponds = pondsQuery.data ?? []
-  useEffect(() => {
-    if (!pondSlug && ponds.length > 0) setPondSlug(ponds[0].slug)
-  }, [ponds, pondSlug])
+  const pondSlug = selectedSlug || ponds[0]?.slug || ''
 
   const publishMut = trpc.app.ponds.publishNews.useMutation({
     onSuccess: () => {
@@ -57,7 +56,7 @@ export default function NewsComposer({ onPublished }: NewsComposerProps) {
             <button
               key={p.slug}
               type="button"
-              onClick={() => setPondSlug(p.slug)}
+              onClick={() => setSelectedSlug(p.slug)}
               className={`h-7 shrink-0 rounded-full px-3 text-[12px] leading-none ${
                 active ? 'bg-olive text-paper-white' : 'bg-olive-tint text-olive'
               }`}

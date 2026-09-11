@@ -12,7 +12,8 @@ import ReviewList from '@/components/spots/ReviewList'
 import ShareSheet from '@/components/spots/ShareSheet'
 import DateSheet from '@/components/spots/DateSheet'
 import FishChip from '@/components/spots/FishChip'
-import { Toast, useToast } from '@/components/spots/Toast'
+import { Toast } from '@/components/spots/Toast'
+import { useToast } from '@/components/spots/useToast'
 import { trpc } from '@/providers/trpc'
 import { mapPondDetail, relativeTime } from '@/lib/live'
 import { usePondMarks } from '@/hooks/usePondMarks'
@@ -83,27 +84,26 @@ function PondReviewSection({
 }) {
   const [page, setPage] = useState(1)
   const [items, setItems] = useState<PondReviewItem[]>([])
-  // 切换钓场时重置分页与累计列表
-  useEffect(() => {
-    setPage(1)
-    setItems([])
-  }, [slug])
 
   const reviewsQuery = trpc.app.ponds.reviews.useQuery(
     { slug, page, pageSize: REVIEW_PAGE_SIZE },
     { enabled: !!slug, retry: 1 },
   )
   const data = reviewsQuery.data
-  // 分页累计：page 1 整体替换，后续页按 id 去重追加
-  useEffect(() => {
-    if (!data) return
-    setItems((prev) => {
-      if (page === 1) return data.items as PondReviewItem[]
-      const seen = new Set(prev.map((r) => r.id))
-      const more = (data.items as PondReviewItem[]).filter((r) => !seen.has(r.id))
-      return [...prev, ...more]
-    })
-  }, [data, page])
+  // 分页累计：page 1 整体替换，后续页按 id 去重追加。
+  // 采用 React 官方的「渲染期按数据变化调整 state」写法，替代 effect 内 setState（后者会级联渲染）。
+  const [prevData, setPrevData] = useState(data)
+  if (data !== prevData) {
+    setPrevData(data)
+    if (data) {
+      setItems((prev) => {
+        if (page === 1) return data.items as PondReviewItem[]
+        const seen = new Set(prev.map((r) => r.id))
+        const more = (data.items as PondReviewItem[]).filter((r) => !seen.has(r.id))
+        return [...prev, ...more]
+      })
+    }
+  }
 
   // 接口未就绪或失败：回退详情页预览评价
   if (reviewsQuery.isError) {
@@ -436,8 +436,14 @@ export default function PondDetail() {
       {/* Section 5 — 在线选钓位 */}
       <SeatPicker seats={pond.seats} selected={seatNo} onSelect={onSelectSeat} />
 
-      {/* Section 6 — 钓友评价（QY-B-002：评分分布条 + 分页列表，失败回退预览） */}
-      <PondReviewSection slug={pond.id} fallbackReviews={pond.reviews} fallbackTotal={pond.reviewCount} />
+      {/* Section 6 — 钓友评价（QY-B-002：评分分布条 + 分页列表，失败回退预览）
+          key=slug：切换钓场时整块重挂载，分页与累计列表自动重置（避免 effect 内 setState） */}
+      <PondReviewSection
+        key={pond.id}
+        slug={pond.id}
+        fallbackReviews={pond.reviews}
+        fallbackTotal={pond.reviewCount}
+      />
 
       {/* Section 7 — 票种列表 */}
       {ticket ? (

@@ -1,7 +1,7 @@
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
-import { TRPCProvider } from "@/providers/trpc"
+import { TRPCProvider } from "@/providers/TRPCProvider"
 import App from './App.tsx'
 import { initSafeArea } from '@/lib/safeArea'
 import { initPerfMonitor } from '@/lib/perf'

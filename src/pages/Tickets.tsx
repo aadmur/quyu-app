@@ -8,7 +8,7 @@ import { orderStore, markOrderUsed, STATUS_META, formatMoney } from '@/data/orde
 import type { Order, OrderStatus } from '@/data/orders'
 import { trpc } from '@/providers/trpc'
 import { mapMyOrder } from '@/lib/live'
-import { useAuthGate } from '@/components/LoginSheet'
+import { useAuthGate } from '@/hooks/useAuthGate'
 
 const TABS: OrderStatus[] = ['pending', 'used', 'done']
 

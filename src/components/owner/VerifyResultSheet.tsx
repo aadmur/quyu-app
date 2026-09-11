@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { m, AnimatePresence } from 'framer-motion'
 import type { PendingOrder } from '@/data/owner'
 
@@ -38,15 +38,18 @@ interface VerifyResultSheetProps {
 
 /** 核销结果弹层：对勾描边动画 + 票据信息卡（对应钓友端 QRCodeCard 信息） */
 export default function VerifyResultSheet({ order, onDone }: VerifyResultSheetProps) {
-  const [verifiedAt, setVerifiedAt] = useState('')
+  // 核销时间取弹层展示时的真实本地时间：按 order 推导，不再用 effect 回写 state
+  const verifiedAt = useMemo(
+    () =>
+      order
+        ? new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
+        : '',
+    [order],
+  )
+
+  // 触觉反馈属外部系统副作用，保留在 effect 中（此处无 setState）
   useEffect(() => {
-    if (order) {
-      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(30)
-      // 核销时间取弹层展示时的真实本地时间
-      setVerifiedAt(
-        new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
-      )
-    }
+    if (order && typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(30)
   }, [order])
 
   return (

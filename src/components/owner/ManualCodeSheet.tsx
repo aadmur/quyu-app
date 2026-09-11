@@ -19,14 +19,22 @@ export default function ManualCodeSheet({ open, onClose, verify, onSuccess }: Ma
   const inputRef = useRef<HTMLInputElement>(null)
   const clearTimer = useRef<number | undefined>(undefined)
 
-  useEffect(() => {
+  // 弹层每次打开时重置输入与错误态。
+  // 采用 React 官方的「渲染期按 props 变化调整 state」写法，替代 effect 内 setState（后者会级联渲染）。
+  const [prevOpen, setPrevOpen] = useState(open)
+  if (open !== prevOpen) {
+    setPrevOpen(open)
     if (open) {
       setCode('')
       setError(false)
-      // 弹层动画结束后聚焦唤起键盘
-      const t = window.setTimeout(() => inputRef.current?.focus(), 350)
-      return () => window.clearTimeout(t)
     }
+  }
+
+  // 弹层动画结束后聚焦唤起键盘（纯副作用，无 setState）
+  useEffect(() => {
+    if (!open) return
+    const t = window.setTimeout(() => inputRef.current?.focus(), 350)
+    return () => window.clearTimeout(t)
   }, [open])
 
   useEffect(() => () => window.clearTimeout(clearTimer.current), [])

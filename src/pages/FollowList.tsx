@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import PageHeader from '@/components/trade/PageHeader'
 import Toast from '@/components/community/Toast'
 import { useToast } from '@/components/community/useToast'
-import { useAuthGate } from '@/components/LoginSheet'
+import { useAuthGate } from '@/hooks/useAuthGate'
 import { trpc } from '@/providers/trpc'
 
 /** 列表项契约：与 api/services/social.ts 的 FollowListItem 对齐 */

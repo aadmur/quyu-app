@@ -11,7 +11,7 @@ import Confetti from '@/components/trade/Confetti'
 import { COUPONS, addOrder, genVerifyCode, formatMoney } from '@/data/orders'
 import type { Order } from '@/data/orders'
 import { trpc } from '@/providers/trpc'
-import { useAuthGate } from '@/components/LoginSheet'
+import { useAuthGate } from '@/hooks/useAuthGate'
 
 const INSURANCE_PRICE = 3
 const MAX_QTY = 4
@@ -200,7 +200,7 @@ export default function Checkout() {
     | null
   const pondSlug = navState?.pondSlug ?? 'qinglong'
 
-  const days = useMemo(next7Days, [])
+  const days = useMemo(() => next7Days(), [])
   const [visitDate, setVisitDate] = useState(() =>
     navState?.visitDate && days.some((d) => d.key === navState.visitDate) ? navState.visitDate : days[0].key,
   )
@@ -236,24 +236,28 @@ export default function Checkout() {
     [detail],
   )
 
-  // 数据就绪后校验票种：带入的 ticketId 不在该钓场真实票种中时回退到第一个票种
-  useEffect(() => {
-    if (tickets.length === 0) return
-    if (!tickets.some((t) => String(t.id) === ticketId)) setTicketId(String(tickets[0].id))
-  }, [tickets, ticketId])
+  // 数据就绪后校验票种：带入的 ticketId 不在该钓场真实票种中时回退到第一个票种。
+  // 用推导值替代 effect 内 setState（后者会级联渲染），并保证票种高亮与下单口径一致。
+  const activeTicketId = tickets.some((t) => String(t.id) === ticketId)
+    ? ticketId
+    : String(tickets[0]?.id ?? '')
 
-  // 数据就绪/日期切换后校验钓位：剔除已订走的，全空时自动补选第一个空闲位
-  useEffect(() => {
-    if (!detail) return
-    setSeatNos((prev) => {
-      const valid = prev.filter((no) => detail.seats.some((s) => s.seatNo === no && !s.isSold))
-      if (valid.length > 0) return valid
-      const firstFree = detail.seats.find((s) => !s.isSold)
-      return firstFree ? [firstFree.seatNo] : []
-    })
-  }, [detail])
+  // 数据就绪/日期切换后校验钓位：剔除已订走的，全空时自动补选第一个空闲位。
+  // 仅在 detail 变化时纠偏（等价原 effect 依赖），不干预用户主动清空选择的动作。
+  const [prevDetail, setPrevDetail] = useState(detail)
+  if (detail !== prevDetail) {
+    setPrevDetail(detail)
+    if (detail) {
+      setSeatNos((prev) => {
+        const valid = prev.filter((no) => detail.seats.some((s) => s.seatNo === no && !s.isSold))
+        if (valid.length > 0) return valid
+        const firstFree = detail.seats.find((s) => !s.isSold)
+        return firstFree ? [firstFree.seatNo] : []
+      })
+    }
+  }
 
-  const ticket = tickets.find((t) => String(t.id) === ticketId) ?? tickets[0]
+  const ticket = tickets.find((t) => String(t.id) === activeTicketId) ?? tickets[0]
   const date = days.find((d) => d.key === visitDate) ?? days[0]
   const coupon = COUPONS.find((c) => c.id === couponId && c.available) ?? null
 
@@ -455,7 +459,7 @@ export default function Checkout() {
         ) : (
           <div className="mt-3 grid grid-cols-2 gap-2">
             {tickets.map((t, i) => {
-              const active = String(t.id) === ticketId
+              const active = String(t.id) === activeTicketId
               return (
                 <m.button
                   key={t.id}

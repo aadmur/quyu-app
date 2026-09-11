@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { Heart, Star } from 'lucide-react'
 import type { Pond } from '@/data/spots'
 import FishChip from './FishChip'
-import { Toast, useToast } from './Toast'
+import { Toast } from './Toast'
+import { useToast } from './useToast'
 import { usePondMarks } from '@/hooks/usePondMarks'
 
 interface PondCardProps {

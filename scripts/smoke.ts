@@ -14,7 +14,7 @@
  */
 import assert from "node:assert";
 import { eq, sql } from "drizzle-orm";
-import { orders, posts, ticketTypes, userEvents } from "../db/schema";
+import { orders, ticketTypes } from "../db/schema";
 import { getDataSource, getQueue } from "../api/infra";
 import { recommendFeed, trackEvent } from "../api/services/recommendService";
 import { createOrder, verifyOrder, myOrders } from "../api/services/trade";

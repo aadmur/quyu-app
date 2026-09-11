@@ -1,18 +1,9 @@
-import { useCallback, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
 
-/** 轻量 toast：底部居中浮起，2s 自动消失（fixed 居中，与 420px 手机壳对齐） */
-export function useToast() {
-  const [message, setMessage] = useState('')
-  const timer = useRef<number | undefined>(undefined)
-  const show = useCallback((msg: string) => {
-    setMessage(msg)
-    window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => setMessage(''), 2000)
-  }, [])
-  return { message, show }
-}
-
+/**
+ * 轻量 toast：底部居中浮起，2s 自动消失（fixed 居中，与 420px 手机壳对齐）。
+ * 状态钩子见同目录 useToast.ts（分文件以保住 Fast Refresh 边界）。
+ */
 export function Toast({ message }: { message: string }) {
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-24 z-50 flex justify-center">

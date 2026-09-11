@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { LogIn } from 'lucide-react'
-import { getKimiOAuthUrl } from '@/components/LoginSheet'
+import { getKimiOAuthUrl } from '@/lib/kimiAuth'
 import PasswordAuthForm from '@/components/PasswordAuthForm'
 
 /**

@@ -11,7 +11,7 @@ import ProductOrdersSheet from '@/components/shop/ProductOrdersSheet'
 import { PRODUCTS } from '@/data/shop'
 import type { Product } from '@/data/shop'
 import { trpc } from '@/providers/trpc'
-import { useAuthGate } from '@/components/LoginSheet'
+import { useAuthGate } from '@/hooks/useAuthGate'
 import type { ProductItem } from '@/lib/live'
 
 /** 后端分类 → 前端分类胶囊（数据库分类名与 UI 胶囊名的映射） */

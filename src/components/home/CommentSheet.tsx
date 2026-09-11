@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { m } from 'framer-motion'
 import { X } from 'lucide-react'
 import type { FeedComment } from '@/data/home'
 import { trpc } from '@/providers/trpc'
-import { useAuthGate } from '@/components/LoginSheet'
+import { useAuthGate } from '@/hooks/useAuthGate'
 import { mapComment } from '@/lib/live'
 import Toast from '@/components/community/Toast'
 import { useToast } from '@/components/community/useToast'
@@ -20,7 +20,8 @@ interface CommentSheetProps {
 /** 评论弹层：底部升起占屏 70%，spring damping 26；评论 stagger 入场；输入框吸底 */
 export default function CommentSheet({ comments, total, postId, onClose }: CommentSheetProps) {
   const [draft, setDraft] = useState('')
-  const [list, setList] = useState<FeedComment[]>(comments)
+  // 本地乐观追加的评论；真实评论返回后按「作者+内容」去重剔除，不再用 effect 回写 state
+  const [appended, setAppended] = useState<FeedComment[]>([])
 
   const live = postId != null
   const commentsQuery = trpc.app.posts.comments.useQuery(
@@ -31,10 +32,12 @@ export default function CommentSheet({ comments, total, postId, onClose }: Comme
   const utils = trpc.useUtils()
   const { toast, showToast } = useToast()
 
-  // 真实评论到达后替换占位列表
-  useEffect(() => {
-    if (commentsQuery.data) setList(commentsQuery.data.map(mapComment))
-  }, [commentsQuery.data])
+  // 列表 = 真实评论（无 postId 时用详情页带来的演示数据）+ 尚未在真实评论中出现的乐观追加项
+  const base: FeedComment[] = commentsQuery.data ? commentsQuery.data.map(mapComment) : comments
+  const list: FeedComment[] = [
+    ...base,
+    ...appended.filter((a) => !base.some((b) => b.text === a.text && b.name === a.name)),
+  ]
 
   const { requireAuth, loginSheet } = useAuthGate()
 
@@ -42,7 +45,7 @@ export default function CommentSheet({ comments, total, postId, onClose }: Comme
     const text = draft.trim()
     if (!text) return
     if (!requireAuth('发表评论')) return
-    setList((prev) => [
+    setAppended((prev) => [
       ...prev,
       { id: `me-${Date.now()}`, name: '我', avatar: '/avatar-8.webp', text, likes: 0, time: '刚刚' },
     ])

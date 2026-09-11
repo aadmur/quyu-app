@@ -9,7 +9,7 @@ import { useToast } from '@/components/community/useToast'
 import { SpeciesPicker, SpotPicker } from '@/components/community/PickerSheets'
 import { PUBLISH_SPOTS, PUBLISH_TOPICS, PUBLISH_SUCCESS_TOAST } from '@/data/community'
 import { trpc } from '@/providers/trpc'
-import { useAuthGate } from '@/components/LoginSheet'
+import { useAuthGate } from '@/hooks/useAuthGate'
 import { pickImages, getCurrentPosition, reverseGeocode, type GeoFix, type GeoFailReason } from '@/lib/native'
 
 const GEO_FAIL_TIPS: Record<GeoFailReason, string> = {

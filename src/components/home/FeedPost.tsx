@@ -6,7 +6,7 @@ import FishIcon from '@/components/FishIcon'
 import CommentSheet from '@/components/home/CommentSheet'
 import type { FeedPost as FeedPostData } from '@/data/home'
 import { trpc } from '@/providers/trpc'
-import { useAuthGate } from '@/components/LoginSheet'
+import { useAuthGate } from '@/hooks/useAuthGate'
 import Toast from '@/components/community/Toast'
 import { useToast } from '@/components/community/useToast'
 

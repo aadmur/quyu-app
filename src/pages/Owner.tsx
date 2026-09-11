@@ -14,7 +14,7 @@ import WeekChart from '@/components/owner/WeekChart'
 import { PENDING_ORDERS, SCAN_DEMO_ORDER } from '@/data/owner'
 import type { PendingOrder } from '@/data/owner'
 import { trpc } from '@/providers/trpc'
-import { useAuthGate } from '@/components/LoginSheet'
+import { useAuthGate } from '@/hooks/useAuthGate'
 
 /** 核销返回的订单 → 结果弹层展示模型 */
 function toPendingOrder(o: {

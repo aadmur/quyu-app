@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Heart, Star } from 'lucide-react'
 import PageHeader from '@/components/trade/PageHeader'
 import { trpc } from '@/providers/trpc'
-import { useAuthGate } from '@/components/LoginSheet'
+import { useAuthGate } from '@/hooks/useAuthGate'
 
 /** 后端 ponds.myFavorites 返回的收藏钓场项（契约：slug/name/region/priceFrom/rating + 封面字段）。
  *  封面字段名未最终确定，渲染时防御性取值：cover ?? coverImage ?? 按 slug 的本地封面约定 */

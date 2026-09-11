@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { trpc } from '@/providers/trpc'
-import { useAuthGate } from '@/components/LoginSheet'
+import { useAuthGate } from '@/hooks/useAuthGate'
 
 /** 钓场标记种类：fav=收藏，news=订阅鱼讯 */
 export type PondMarkKind = 'fav' | 'news'
