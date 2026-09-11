@@ -2,6 +2,15 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/) 与 [Keep a Changelog](https://keepachangelog.com/zh-CN/) 规范。
 
+## [v8.10.2] - 2026-09-12 「图片路径统一到 .webp」
+
+> 状态：**已于 2026-09-12 00:19 (CST) 上线**（数据库迁移 + 代码对齐 + 下线兼容副本）。
+
+### 变更
+- **数据库图片路径迁移到 .webp**：把 v8.10.1 事故后临时补的「旧文件名兼容副本」下线，改为一劳永逸地消除「代码层 + 数据层」双重固化。22 个固定旧路径精确改为 `.webp`（`posts.images`/`author_avatar`、`products.image`、`ponds.cover`、`reviews.images`），明确排除 `/uploads/` 与保留名 `avatar-1.png` / `pond-yunxi-1.jpg`。迁移前全库备份 `quyu-before-webp-migrate-20260912-000830.sql.gz`，迁移后逐列校验 0 错迁/漏迁。
+- **代码对齐**：`db/seed.ts` 25 处旧路径 → `.webp`；`public/` 删除 29 个兼容副本（`public/` 997 → 891 KB）；`check-images.mjs` 去掉兼容副本清单逻辑、保留 `db/` 扫描；`smoke-static.mjs` 改为校验「迁移后 `.webp` 路径 200」。
+- 迁移 SQL 留档 `_archive/migrate-images-to-webp.sql`；`restore-legacy-images.py` 标注为「仅回滚用」。
+
 ## [v8.10.1] - 2026-09-11 「图片 404 事故修复」
 
 > 状态：**已于 2026-09-11 23:43 (CST) 热修复上线**。
