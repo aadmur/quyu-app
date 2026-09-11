@@ -129,22 +129,12 @@ try {
     check(`${legacy}（DB/服务端固化的原名）→ 200`, res.status, 200);
   }
 
-  // 兼容副本全量回归（v8.10.1 事故修复）：
-  // 数据库里存的是旧文件名（/feed-1.jpg、/prod-rod.jpg …），
-  // v8.10.0 把位图改名为 .webp 后这些路径全 404 —— 线上「图片都加载不出来」。
-  // 这里逐个真实请求清单内每个路径，任何一个 404 都必须让冒烟失败。
-  const compatManifest = path.resolve("scripts/image-legacy-compat.json");
-  const compat = JSON.parse(fs.readFileSync(compatManifest, "utf8")).paths;
-  const broken = [];
-  for (const p of compat) {
-    const res = await head(p);
-    if (res.status !== 200) broken.push(`${p}(${res.status})`);
+  // 数据库图片路径已迁移到 .webp（2026-09-12）：抽样验证 .webp 可达，
+  // 确保「数据层路径」不再依赖旧文件名。全量由 check-images.mjs 的 db/ 扫描把关。
+  for (const webpDb of ["/feed-1.webp", "/avatar-2.webp", "/prod-rod.webp", "/pond-qinglong-1.webp", "/review-1.webp"]) {
+    const res = await head(webpDb);
+    check(`${webpDb}（数据库迁移后的路径）→ 200`, res.status, 200);
   }
-  check(
-    `兼容副本全量可达（数据库历史路径）`,
-    broken.length === 0 ? `全部 ${compat.length} 个 200` : `404/异常：${broken.join(", ")}`,
-    (v) => v.startsWith("全部"),
-  );
 
   console.log("\n── 入口 HTML 无外链字体、含字体 preload ──");
   const htmlRes = await head("/", { Accept: "text/html" });
