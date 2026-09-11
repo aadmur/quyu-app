@@ -1,13 +1,22 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ["class"],
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  // 只扫描真实源码：项目全为 ts/tsx，去掉 js/jsx 可少扫一遍；
+  // 亦不再包含已删除的 shadcn ui 组件（QY-PERF-007）
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       fontFamily: {
         sans: ['-apple-system', '"PingFang SC"', '"HarmonyOS Sans SC"', '"Microsoft YaHei"', 'sans-serif'],
         num: ['"Bebas Neue"', '"Oswald"', '-apple-system', '"PingFang SC"', '"HarmonyOS Sans SC"', '"Microsoft YaHei"', 'sans-serif'],
       },
+      /**
+       * 色板只保留产品自有 token（QY-PERF-007）。
+       * 原先还挂着 shadcn 语义色（background / foreground / card / popover /
+       * primary / secondary / muted / accent / destructive / border / input /
+       * ring / sidebar），它们只服务于已删除的 51 个 ui 组件，会把整套 CSS
+       * 变量与对应工具类打进产物。
+       */
       colors: {
         ink: {
           DEFAULT: "#2d1e1e",
@@ -30,80 +39,35 @@ module.exports = {
         clay: "#a8512f",
         heart: "#b3502e",
         line: "#2d1e1e14",
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
-        },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive) / <alpha-value>)",
-          foreground: "hsl(var(--destructive-foreground) / <alpha-value>)",
-        },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
-        },
-        popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
-        },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
-        sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
-        },
       },
+      /**
+       * 裸 `border`（不带颜色）的默认色。
+       * 原实现靠 `* { @apply border-border; }` 全局设置 border-color，该规则
+       * 随 shadcn 变量一并移除；若不补默认值，裸 `border` 会退回 currentColor
+       * （深色文字色），出现比预期重得多的描边。这里统一取产品 hairline 色。
+       */
+      borderColor: {
+        DEFAULT: "#2d1e1e14",
+      },
+      /**
+       * 圆角刻度（保留）。全项目 rounded-xl 用了 101 处、rounded-lg 21 处，
+       * 它们都建立在 --radius 之上；若退回 Tailwind 默认刻度，这些圆角会
+       * 各缩小约 2px（xl 14px→12px、lg 10px→8px），属可见回归。
+       * --radius 定义在 src/index.css 的 :root，仅依赖本产品自己的刻度。
+       */
       borderRadius: {
-        xl: "calc(var(--radius) + 4px)",
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
         xs: "calc(var(--radius) - 6px)",
+        sm: "calc(var(--radius) - 4px)",
+        md: "calc(var(--radius) - 2px)",
+        lg: "var(--radius)",
+        xl: "calc(var(--radius) + 4px)",
       },
       boxShadow: {
         xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
       },
-      keyframes: {
-        "accordion-down": {
-          from: { height: "0" },
-          to: { height: "var(--radix-accordion-content-height)" },
-        },
-        "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: "0" },
-        },
-        "caret-blink": {
-          "0%,70%,100%": { opacity: "1" },
-          "20%,50%": { opacity: "0" },
-        },
-      },
-      animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
-        "caret-blink": "caret-blink 1.25s ease-out infinite",
-      },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  // 无需插件：原先的 tailwindcss-animate 只服务 radix accordion / input-otp
+  // 等已删除组件，其提供的 animate-in / fade-in 系列类在全项目零使用。
+  plugins: [],
 }

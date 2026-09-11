@@ -113,6 +113,19 @@ try {
   check("preload 自托管 Oswald", html.includes("/fonts/oswald-latin.woff2"), true);
   check("preload 自托管 Bebas", html.includes("/fonts/bebas-neue-400.woff2"), true);
 
+  console.log("\n── 体积预算（QY-PERF-001/003/007）──");
+  const kb = (bytes) => Math.round((bytes / 1024) * 10) / 10;
+  // CSS：删除 shadcn 组件层后实测 br 6.3 KB，设 12 KB 预算（QY-PERF-007 验收线）
+  check("CSS brotli ≤ 12 KB", kb(ASSETS.css.br), (v) => v <= 12, "KB");
+  // 首屏主 JS：预压缩后实测 ~50.8 KB，设 70 KB 预算
+  check("主 JS brotli ≤ 70 KB", kb(ASSETS.js.br), (v) => v <= 70, "KB");
+  // 字体合计 ≤ 40 KB（QY-PERF-003 验收线）
+  const fontDir = path.resolve("dist/public/fonts");
+  const fontBytes = fs.existsSync(fontDir)
+    ? fs.readdirSync(fontDir).reduce((sum, f) => sum + fs.statSync(path.join(fontDir, f)).size, 0)
+    : 0;
+  check("自托管字体合计 ≤ 40 KB", kb(fontBytes), (v) => v > 0 && v <= 40, "KB");
+
   console.log("\n── ETag / 304 协商 ──");
   const first = await head(jsPath, { "Accept-Encoding": "br" });
   const etag = first.headers.get("etag");
