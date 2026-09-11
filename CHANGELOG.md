@@ -2,6 +2,43 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/) 与 [Keep a Changelog](https://keepachangelog.com/zh-CN/) 规范。
 
+## [v8.10.0] - 2026-09-11 「性能专项 + 工程卫生」（迭代计划 v12）
+
+> 状态：**本地全链路验证通过，尚未部署生产**。部署前需用户确认（流程见 NEXT-ITERATION 第二节）。
+
+### 性能（QY-PERF-001 ~ 008）
+首屏上线传输量（基线未压缩裸传 → 优化后 brotli 直出）：**1047.9 KB → 188.5 KB（−82%）**；首屏图片集合 2086 → 430 KB。
+
+- **静态资源预压缩直出 + 分级缓存头**（QY-PERF-001）：`scripts/precompress.mjs` 构建期产出 `.br`(q11)/`.gz`(l9) 变体，运行时零 CPU 直出；`api/lib/vite.ts` 重写静态中间件——按 `Accept-Encoding` q 值协商、`/assets/*` immutable 一年 / `index.html` no-cache / `/uploads/*` 一天、补 ETag + Vary + 304、目录穿越防护。修掉「缺 Cache-Control 导致发版后旧 index.html + 已删 hash 资源白屏」。实测主 JS 943,532 B → 214,587 B（br，−77.3%），CSS 101,903 → 14,015 B（br，−86.2%）
+- **路由级代码分割 + vendor 分组**（QY-PERF-002）：21 个静态 import → 首页/Login 静态 + 18 个二级页 `React.lazy`（统一 `<Lazy>` 包裹 + 骨架占位）；`manualChunks` 按 react/data/router/icons/utils/capacitor 分组。首屏 1021 → 216.1 KB，入口 chunk 943 → 134 KB，1 → 34 chunk
+- **数字字体本地化**（QY-PERF-003）：删除 `fonts.googleapis.com` 渲染阻塞外链，自托管 Oswald（可变字体，单文件覆盖 400/500/600）+ Bebas Neue latin 子集，合计 34.4 KB（预算 ≤40 KB），`font-display: swap`；`scripts/check-fonts.mjs` 接入 build 门禁。首屏第三方域名依赖 → 0
+- **图片转 WebP + 按显示尺寸降采样**（QY-PERF-004）：`scripts/optimize-images.py` 按「显示尺寸 × 1.5」（头像 ×2）重采样，逐类上限 avatar 128 / feed 640 / pond 720 / prod 560 / banner 720 / review 560 / cover 720。29 张转 WebP；`public/` 3489 → 891 KB（−74%），首屏图片 2086 → 430 KB（−79%），头像 7 张 760 → 15 KB。`/avatar-1.png` 与 `/pond-yunxi-1.jpg` 因被 DB 列默认值与服务端兜底引用**保留原名原格式**，仅原地重编码
+- **framer-motion 按需能力包**（QY-PERF-005）：首屏静态闭包剥离 domMax（layout/drag/useMotionValue），需要者经 `LazyMax` 包裹延迟加载；`scripts/check-motion-boundary.mjs` 作为 build 前置门禁（三条动画能力不变量）。首屏 216.1 → 203.2 KB
+- **QueryClient 默认值收敛**（QY-PERF-006）：`staleTime` 30s / `gcTime` 5min / `refetchOnWindowFocus` false / `refetchOnReconnect` true / `retry` 1（`retryDelay` 上限 3s）/ mutations `retry` 0。消除 38 处无 staleTime 调用点的重复请求、切前台重取风暴、以及 5xx 静默重试约 7 秒。正确性依据：37 处 `invalidate` 主动失效不受 staleTime 影响
+- **清理 shadcn 组件层与死依赖**（QY-PERF-007）：删除 59 个零引用文件 + 45 个零引用包（dependencies 68→25、dev 25→23）；Login/NotFound 两页改用产品 token 重写并中文化。CSS br 14.0 → 6.2 KB、gzip 17.31 → 7.46 KB，首屏 203.2 → 187.7 KB。**两处必须显式保留**：`borderColor.DEFAULT = #2d1e1e14`（裸 `border` 上色来源）与 `borderRadius` 刻度（rounded-xl 101 处 / rounded-lg 21 处）
+- **冷启动埋点与验收工具**（QY-PERF-008）：`/api/perf` 匿名采样接口（白名单字段校验、服务端补写 UA、落 `logs/perf-YYYY-MM-DD.jsonl`、超限不落盘、非法 JSON 仍 204）；前端 `src/lib/perf.ts` 用 `PerformanceObserver`(buffered) 采集 FCP/LCP/TTI + 资源字节数，`sendBeacon` 上报；配套 `scripts/measure-coldstart.mjs`（网络+CPU 降速实测）、`scripts/perf-log-stats.mjs`（真机采样分档聚合）、`scripts/bench-order-p99.ts`（下单 P99 基准工具）、`smoke-static.mjs` 新增 8 项埋点断言、`docs/perf/真机冷启动测量SOP.md`
+
+### 工程卫生
+- **lint 存量清零**：18 项（17 error + 1 warning，11 个文件）→ **0 项**。根因是 `eslint-plugin-react-hooks` 7.0.1 的 React Compiler 派生规则（`set-state-in-effect` / `use-memo` / `static-components` 等）对 v5 时代代码的存量违约
+  - 9 处 `set-state-in-effect` → 改为渲染期推导 / 官方「按变化调整 state」写法；切 key 即重置的场景改用 `key={slug}` 重挂载
+  - 5 处 `react-refresh/only-export-components` → 按已有约定拆分模块：`providers/trpc.tsx` → `trpc.ts`（单例，**对外路径不变**）+ `TRPCProvider.tsx`；`spots/Toast.tsx` → 加 `spots/useToast.ts`；`LoginSheet.tsx` → 加 `lib/kimiAuth.ts` + `hooks/useAuthGate.tsx`
+  - 4 处类型/未用变量：`api/lib/http.ts` 引入 `JsonValue` 替代 `any`、`scripts/smoke.ts` 清理未用导入、`Checkout.tsx` 的 `useMemo(next7Days, [])` 改内联箭头
+  - 注意：`use-memo` 错误会让编译器分析在该组件处 bail out，**遮挡后续错误**（Checkout 修掉 1 处后另 2 处才浮现）——lint 必须修到 0 才算数
+
+### 验证（本地实测）
+- `tsc -b` → 0 error；`eslint .` → 0 problem；`vite build` + `esbuild boot.ts` 通过
+- 构建门禁：`check-fonts` / `check-images` / `check-perf-wiring` / `check-motion-boundary` / `precompress` 全 PASS
+- `smoke-static.mjs` 全项 PASS（压缩协商 / 缓存头 / SPA fallback / 404 / 目录穿越 / 304 / 字体 / 图片 / 体积预算 / 埋点上报）
+- 体积预算实测：CSS br 6.3 KB（≤12）、主 JS br 50.8 KB（≤70）、字体 34.4 KB（≤40）
+- 冷启动实测（CDP 驱动真实 Chromium，每次全新 profile = 真冷缓存；基线 `3e59500` 注入同源埋点后重新构建，同一把尺子；叠加 4× CPU 降速，p50）：
+  - **Slow 4G**（1.5 Mbps/300 ms，10 次）：传输 1026 → 287 KB（−72%）、FCP 7064 → 2464 ms（−65%）、LCP 7560 → 2984 ms（−61%）、可交互 7343 → 2708 ms（−63%）
+  - **Fast 4G**（4 Mbps/20 ms，5 次）：传输 1149 → 290 KB（−75%）、FCP 3212 → 1264 ms（−61%）、LCP 3568 → 1772 ms（−50%）、可交互 3436 → 1551 ms（−55%，达成 <2 s 设计指标）
+
+### 说明
+- 提交记录（分支 `v12-app-tuning`，每项一件）：`ab1d23c`(001) `f0b8f3f`(003) `55334be`(002) `689f0f7`(005) `9a19703`(006) `b30489d`(007) `265ec41`(004) `f7f5dbe`(008)；lint 清零另计一件
+- 冷启动数字为**实验室实测**（真实 Chromium + 网络/CPU 节流）。**真机 WebView 采样**受 APK 限制（Capacitor `webContentsDebuggingEnabled` 在 release 构建默认关闭），需部署后按 `docs/perf/真机冷启动测量SOP.md` 走服务端采样路径采集；**下单 P99** 因本机 MySQL 非测试实例未产出可信数字（工具 `scripts/bench-order-p99.ts` 已就绪，待生产侧执行）
+- 无单测覆盖（`vitest` 配置的 `api/**/*.test.ts` 为空），回归依赖类型检查 + 构建 + 静态门禁 + 冒烟脚本
+
 ## [v8.9.0] - 2026-09-06 「合规三件套补齐 + 版本触达」（迭代计划 v11 全量）
 
 ### 新增
