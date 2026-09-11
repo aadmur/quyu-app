@@ -85,7 +85,7 @@ export function mapPondListItem(p: PondListItem, todayNews?: string): Pond {
     cover: p.cover,
     album: p.album,
     todayNews,
-    news: { owner: '塘主', ownerAvatar: '/avatar-5.png', text: todayNews ?? '', time: '' },
+    news: { owner: '塘主', ownerAvatar: '/avatar-5.webp', text: todayNews ?? '', time: '' },
     intro: p.intro ?? '',
     seats: [],
     defaultSeat: 0,
@@ -139,7 +139,7 @@ export function mapPondDetail(d: PondDetailData): Pond {
     todayNews: latestNews?.content,
     news: {
       owner: '塘主',
-      ownerAvatar: '/avatar-5.png',
+      ownerAvatar: '/avatar-5.webp',
       text: latestNews?.content ?? '暂无鱼讯，欢迎来电咨询',
       time: latestNews ? relativeTime(latestNews.createdAt) : '',
     },

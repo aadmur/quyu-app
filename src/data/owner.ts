@@ -33,9 +33,9 @@ export interface PendingOrder {
 }
 
 export const PENDING_ORDERS: PendingOrder[] = [
-  { id: 'o1', name: '浮漂小王子', avatar: '/avatar-2.png', ticket: '全天票', seat: '8 号位', note: '已到场 20 分钟', code: '552138' },
-  { id: 'o2', name: '阿杰爱钓鱼', avatar: '/avatar-6.png', ticket: '夜钓票', seat: '17 号位', note: '预约 18:00 到场', code: '908172' },
-  { id: 'o3', name: '周大爷', avatar: '/avatar-4.png', ticket: '半天票', seat: '3 号位', note: '已到场 5 分钟', code: '310245' },
+  { id: 'o1', name: '浮漂小王子', avatar: '/avatar-2.webp', ticket: '全天票', seat: '8 号位', note: '已到场 20 分钟', code: '552138' },
+  { id: 'o2', name: '阿杰爱钓鱼', avatar: '/avatar-6.webp', ticket: '夜钓票', seat: '17 号位', note: '预约 18:00 到场', code: '908172' },
+  { id: 'o3', name: '周大爷', avatar: '/avatar-4.webp', ticket: '半天票', seat: '3 号位', note: '已到场 5 分钟', code: '310245' },
 ]
 
 /** 扫码/手动输码演示命中的订单（对应钓友端 /tickets 的 QRCodeCard） */

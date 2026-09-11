@@ -5,7 +5,7 @@ export default function ShopBanner() {
   return (
     <section className="mx-4 mb-4 mt-2 overflow-hidden rounded-2xl relative h-[140px]">
       <m.img
-        src="/shop-banner.jpg"
+        src="/shop-banner.webp"
         alt="开竿季 渔具静物"
         className="absolute inset-0 h-full w-full object-cover"
         initial={{ scale: 1.1 }}

@@ -106,6 +106,26 @@ try {
     );
   }
 
+  console.log("\n── 图片资产（QY-PERF-004）──");
+  // WebP 需正确的 MIME 与长缓存；同时验证「保留原名」的兼容资产仍可访问
+  const publicDir = path.resolve("dist/public");
+  const webp = fs.existsSync(publicDir)
+    ? fs.readdirSync(publicDir).filter((f) => f.endsWith(".webp"))
+    : [];
+  check("产物含 WebP 图片", webp.length > 0, true, `${webp.length} 个`);
+  if (webp.length > 0) {
+    const res = await head(`/${webp[0]}`);
+    check(
+      `/${webp[0]} → 200 + image/webp`,
+      `${res.status}/${res.headers.get("content-type")}`,
+      (v) => v.startsWith("200/") && v.includes("image/webp"),
+    );
+  }
+  for (const legacy of ["/avatar-1.png", "/pond-yunxi-1.jpg"]) {
+    const res = await head(legacy);
+    check(`${legacy}（DB/服务端固化的原名）→ 200`, res.status, 200);
+  }
+
   console.log("\n── 入口 HTML 无外链字体、含字体 preload ──");
   const htmlRes = await head("/", { Accept: "text/html" });
   const html = await htmlRes.text();

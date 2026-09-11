@@ -18,7 +18,7 @@ export default function PondStatusCard({ open, onToggle }: PondStatusCardProps) 
       className="mx-4 mb-4 mt-2 flex items-center gap-3 rounded-2xl bg-olive-deep p-3.5 transition-[filter] duration-300"
       style={{ filter: open ? 'saturate(1)' : 'saturate(0.5)' }}
     >
-      <img src="/pond-qinglong-1.jpg" alt="青龙湾生态钓场" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+      <img src="/pond-qinglong-1.webp" alt="青龙湾生态钓场" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-[15px] font-semibold leading-[22px] text-paper-white">青龙湾生态钓场</p>
         <p className="text-[12px] leading-4 text-paper-white/60">评分 4.8 · 326 条评价</p>

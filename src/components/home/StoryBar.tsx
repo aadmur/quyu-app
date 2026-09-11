@@ -33,7 +33,7 @@ export default function StoryBar() {
             className="relative rounded-full border-2 border-dashed border-ink-40 p-[3px]"
             aria-label="发动态"
           >
-            <img src="/avatar-8.png" alt="我的头像" className="h-14 w-14 rounded-full object-cover" />
+            <img src="/avatar-8.webp" alt="我的头像" className="h-14 w-14 rounded-full object-cover" />
             <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-paper bg-olive text-paper-white">
               <Plus size={12} strokeWidth={2.6} />
             </span>

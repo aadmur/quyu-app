@@ -34,9 +34,9 @@ export interface Pond {
 }
 
 export const PONDS: Pond[] = [
-  { id: 'qinglong', name: '青龙湾生态钓场', cover: '/pond-qinglong-1.jpg', location: '武汉 · 江夏', rating: 4.8 },
-  { id: 'ludao', name: '鹭岛湖路亚基地', cover: '/pond-ludao-1.jpg', location: '武汉 · 东西湖', rating: 4.6 },
-  { id: 'laozhou', name: '老周家斤塘', cover: '/pond-laozhou-1.jpg', location: '武汉 · 黄陂', rating: 4.5 },
+  { id: 'qinglong', name: '青龙湾生态钓场', cover: '/pond-qinglong-1.webp', location: '武汉 · 江夏', rating: 4.8 },
+  { id: 'ludao', name: '鹭岛湖路亚基地', cover: '/pond-ludao-1.webp', location: '武汉 · 东西湖', rating: 4.6 },
+  { id: 'laozhou', name: '老周家斤塘', cover: '/pond-laozhou-1.webp', location: '武汉 · 黄陂', rating: 4.5 },
 ]
 
 export interface CheckoutDate {

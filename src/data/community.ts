@@ -16,7 +16,7 @@ export interface Profile {
 export const PROFILE: Profile = {
   name: '江边老陈',
   avatar: '/avatar-1.png',
-  cover: '/profile-cover.jpg',
+  cover: '/profile-cover.webp',
   level: '钓友 LV6',
   bio: '二十年野钓佬，专攻翘嘴和鲫鱼 · 武汉',
   stats: { catches: 128, following: 356, followers: 892 },
@@ -39,15 +39,15 @@ export interface CatchItem {
 }
 
 export const CATCH_WALL: CatchItem[] = [
-  { id: 'w1', src: '/feed-1.jpg', likes: 1283, commentCount: 86, caption: '凌晨四点半的翘嘴，6.8 斤，值了！', time: '2 小时前' },
-  { id: 'w2', src: '/feed-2.jpg', multi: true, likes: 462, commentCount: 31, caption: '一下午 23 尾鲫鱼，12 号位永远的神', time: '3 天前' },
-  { id: 'w3', src: '/feed-3.jpg', likes: 358, commentCount: 24, caption: '路亚鳜鱼，花纹漂亮得不像话', time: '5 天前' },
-  { id: 'w4', src: '/feed-4.jpg', likes: 689, commentCount: 45, caption: '青龙湾的黄昏，钓的不是鱼是心情', time: '1 周前' },
-  { id: 'w5', src: '/feed-5.jpg', likes: 521, commentCount: 38, caption: '夜钓老周家斤塘，一目红点亮整夜', time: '1 周前' },
-  { id: 'w6', src: '/feed-6.jpg', video: true, likes: 1042, commentCount: 73, caption: '草鱼入护瞬间，水花炸开', time: '2 周前' },
-  { id: 'w7', src: '/feed-7.jpg', multi: true, likes: 897, commentCount: 112, caption: '带孙子出钓，传承从一根小竿开始', time: '3 周前' },
-  { id: 'w8', src: '/review-1.jpg', likes: 245, commentCount: 18, caption: '斤塘大鲫一尾，半斤多', time: '1 个月前' },
-  { id: 'w9', src: '/pond-qinglong-2.jpg', likes: 176, commentCount: 12, caption: '木栈道钓台，我的老位置', time: '1 个月前' },
+  { id: 'w1', src: '/feed-1.webp', likes: 1283, commentCount: 86, caption: '凌晨四点半的翘嘴，6.8 斤，值了！', time: '2 小时前' },
+  { id: 'w2', src: '/feed-2.webp', multi: true, likes: 462, commentCount: 31, caption: '一下午 23 尾鲫鱼，12 号位永远的神', time: '3 天前' },
+  { id: 'w3', src: '/feed-3.webp', likes: 358, commentCount: 24, caption: '路亚鳜鱼，花纹漂亮得不像话', time: '5 天前' },
+  { id: 'w4', src: '/feed-4.webp', likes: 689, commentCount: 45, caption: '青龙湾的黄昏，钓的不是鱼是心情', time: '1 周前' },
+  { id: 'w5', src: '/feed-5.webp', likes: 521, commentCount: 38, caption: '夜钓老周家斤塘，一目红点亮整夜', time: '1 周前' },
+  { id: 'w6', src: '/feed-6.webp', video: true, likes: 1042, commentCount: 73, caption: '草鱼入护瞬间，水花炸开', time: '2 周前' },
+  { id: 'w7', src: '/feed-7.webp', multi: true, likes: 897, commentCount: 112, caption: '带孙子出钓，传承从一根小竿开始', time: '3 周前' },
+  { id: 'w8', src: '/review-1.webp', likes: 245, commentCount: 18, caption: '斤塘大鲫一尾，半斤多', time: '1 个月前' },
+  { id: 'w9', src: '/pond-qinglong-2.webp', likes: 176, commentCount: 12, caption: '木栈道钓台，我的老位置', time: '1 个月前' },
 ]
 
 /* ------------------------------ 鱼获统计 ------------------------------ */

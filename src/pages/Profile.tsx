@@ -33,10 +33,10 @@ import { trpc } from '@/providers/trpc'
 import LoginSheet from '@/components/LoginSheet'
 import ProductOrdersSheet from '@/components/shop/ProductOrdersSheet'
 
-const AVATAR_CHOICES = ['/avatar-1.png', '/avatar-2.png', '/avatar-3.png', '/avatar-4.png']
+const AVATAR_CHOICES = ['/avatar-1.png', '/avatar-2.webp', '/avatar-3.webp', '/avatar-4.webp']
 
 // QY-E-004 内置封面（public/ 现有钓场风景图）
-const COVER_CHOICES = ['/pond-qinglong-1.jpg', '/pond-yunxi-1.jpg', '/pond-ludao-1.jpg']
+const COVER_CHOICES = ['/pond-qinglong-1.webp', '/pond-yunxi-1.jpg', '/pond-ludao-1.webp']
 
 const EASE_OUT = [0.16, 1, 0.3, 1] as [number, number, number, number]
 

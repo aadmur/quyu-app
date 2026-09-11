@@ -44,7 +44,7 @@ export default function CommentSheet({ comments, total, postId, onClose }: Comme
     if (!requireAuth('发表评论')) return
     setList((prev) => [
       ...prev,
-      { id: `me-${Date.now()}`, name: '我', avatar: '/avatar-8.png', text, likes: 0, time: '刚刚' },
+      { id: `me-${Date.now()}`, name: '我', avatar: '/avatar-8.webp', text, likes: 0, time: '刚刚' },
     ])
     setDraft('')
     if (live) {
@@ -121,7 +121,7 @@ export default function CommentSheet({ comments, total, postId, onClose }: Comme
           className="flex shrink-0 items-center gap-2 border-t border-line px-3 py-2"
           style={{ paddingBottom: 'max(var(--safe-bottom), 8px)' }}
         >
-          <img src="/avatar-8.png" alt="" className="h-8 w-8 rounded-full object-cover" />
+          <img src="/avatar-8.webp" alt="" className="h-8 w-8 rounded-full object-cover" />
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
