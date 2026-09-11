@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { m, AnimatePresence } from 'framer-motion'
 import { Home, MapPin, ShoppingBag, User, Plus, Signal, Wifi, BatteryFull } from 'lucide-react'
 import { isNativeApp } from '@/lib/safeArea'
+import { markFirstInteractive } from '@/lib/perf'
 import { MotionFeatures } from '@/providers/motion'
 import UpdateSheet from './UpdateSheet'
 
@@ -141,6 +142,12 @@ export default function Layout() {
   const showTabBar = TAB_PATHS.includes(location.pathname)
   // 原生安卓壳：渲染真实状态栏让位区（--safe-top），否则渲染模拟状态栏
   const [native] = useState(() => isNativeApp())
+
+  // 首屏可交互打点（QY-PERF-008）：壳层首帧提交后再等两帧，确保真有一帧已绘制。
+  // 内部只记录一次，重复调用无副作用。
+  useEffect(() => {
+    markFirstInteractive()
+  }, [])
 
   return (
     <MotionFeatures>

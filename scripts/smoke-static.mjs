@@ -5,10 +5,13 @@
  */
 import { spawn } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 const PORT = process.env.PORT || "3100";
 const BASE = `http://127.0.0.1:${PORT}`;
+/** 冒烟样本写到这里，不污染 logs/ 里的真实采样（QY-PERF-008） */
+const SMOKE_PERF_DIR = path.join(os.tmpdir(), "qy-smoke-perf");
 
 /** 从产物目录发现实际文件名，避免 hash 变化导致断言失效 */
 function discoverAssets() {
@@ -37,7 +40,7 @@ const ASSETS = discoverAssets();
 const child = spawn(
   process.execPath,
   ["-e", 'import("./dist/boot.js")'],
-  { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, NODE_ENV: "production", PORT } },
+  { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, NODE_ENV: "production", PORT, PERF_LOG_DIR: SMOKE_PERF_DIR } },
 );
 child.stdout.on("data", () => {});
 child.stderr.on("data", () => {});
@@ -145,6 +148,67 @@ try {
     ? fs.readdirSync(fontDir).reduce((sum, f) => sum + fs.statSync(path.join(fontDir, f)).size, 0)
     : 0;
   check("自托管字体合计 ≤ 40 KB", kb(fontBytes), (v) => v > 0 && v <= 40, "KB");
+
+  console.log("\n── 冷启动埋点上报（QY-PERF-008）──");
+  // 采样必须「匿名可上报、清洗后落盘、失败也不影响客户端」。
+  // 注意落盘目录是 SMOKE_PERF_DIR（见上方 spawn 的 PERF_LOG_DIR），
+  // 合成探针值绝不能写进 logs/ 与真实用户样本混在一起。
+  const perfLog = path.join(SMOKE_PERF_DIR, `perf-${new Date().toISOString().slice(0, 10)}.jsonl`);
+  // 先清掉上一次冒烟的残留，让下面几条体积断言是确定性的
+  try {
+    fs.rmSync(perfLog, { force: true });
+  } catch {
+    /* ignore */
+  }
+  const sizeOf = () => (fs.existsSync(perfLog) ? fs.statSync(perfLog).size : 0);
+  const beforeSize = sizeOf();
+  check("冒烟样本与真实日志目录隔离", perfLog.startsWith(SMOKE_PERF_DIR), true);
+
+  const beacon = await fetch(BASE + "/api/perf", {
+    method: "POST",
+    headers: { "content-type": "application/json", "user-agent": "QY-Smoke/1.0 (cold-start)" },
+    body: JSON.stringify({
+      fcpMs: 812,
+      lcpMs: 1340,
+      interactiveMs: 1602,
+      transferBytes: 421300,
+      requestCount: 24,
+      effectiveType: "4g",
+      path: "/",
+      // 以下两条是「注入面」探针：白名单外键 / 类型不符的值都不得落盘
+      evil: "<script>alert(1)</script>",
+      ttfbMs: "not-a-number",
+    }),
+  });
+  check("/api/perf → 204", beacon.status, 204);
+  check("采样已落盘", sizeOf() > beforeSize, true, path.basename(perfLog));
+
+  let last = null;
+  if (sizeOf() > beforeSize) {
+    const lines = fs.readFileSync(perfLog, "utf8").trim().split("\n");
+    last = JSON.parse(lines[lines.length - 1]);
+  }
+  check("白名单外字段被丢弃（evil）", last ? "evil" in last : "无样本", false);
+  check("类型不符字段被丢弃（ttfbMs）", last ? "ttfbMs" in last : "无样本", false);
+  check("数值字段正常保留（fcpMs）", last?.fcpMs, 812);
+  check("服务端补写 UA", last?.ua, (v) => typeof v === "string" && v.length > 0);
+
+  // 缺少首屏指标的样本无意义，应被拒（不落盘）
+  const beforeNoise = sizeOf();
+  await fetch(BASE + "/api/perf", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ path: "/no-metrics" }),
+  });
+  check("无首屏指标的样本不落盘", sizeOf(), beforeNoise);
+
+  // 非法 JSON 也必须 204：埋点不得把错误反射回客户端
+  const badJson = await fetch(BASE + "/api/perf", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "not-json{",
+  });
+  check("非法 JSON → 仍 204", badJson.status, 204);
 
   console.log("\n── ETag / 304 协商 ──");
   const first = await head(jsPath, { "Accept-Encoding": "br" });

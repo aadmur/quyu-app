@@ -16,4 +16,6 @@ export const Paths = {
   oauthCallback: "/api/oauth/callback",
   /** 登录 CSRF 防护：前端跳转授权前先取 nonce（写 HttpOnly cookie） */
   oauthNonce: "/api/oauth/nonce",
+  /** 冷启动性能采样上报（QY-PERF-008）：匿名、无需登录，落 JSONL */
+  perf: "/api/perf",
 } as const;
