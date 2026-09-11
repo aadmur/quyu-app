@@ -4,7 +4,7 @@
 
 ## [v8.10.0] - 2026-09-11 「性能专项 + 工程卫生」（迭代计划 v12）
 
-> 状态：**本地全链路验证通过，尚未部署生产**。部署前需用户确认（流程见 NEXT-ITERATION 第二节）。
+> 状态：**已于 2026-09-11 21:38 (CST) 部署至生产**并完成线上验收（见下方「生产验收」）。
 
 ### 性能（QY-PERF-001 ~ 008）
 首屏上线传输量（基线未压缩裸传 → 优化后 brotli 直出）：**1047.9 KB → 188.5 KB（−82%）**；首屏图片集合 2086 → 430 KB。
@@ -30,13 +30,23 @@
 - 构建门禁：`check-fonts` / `check-images` / `check-perf-wiring` / `check-motion-boundary` / `precompress` 全 PASS
 - `smoke-static.mjs` 全项 PASS（压缩协商 / 缓存头 / SPA fallback / 404 / 目录穿越 / 304 / 字体 / 图片 / 体积预算 / 埋点上报）
 - 体积预算实测：CSS br 6.3 KB（≤12）、主 JS br 50.8 KB（≤70）、字体 34.4 KB（≤40）
-- 冷启动实测（CDP 驱动真实 Chromium，每次全新 profile = 真冷缓存；基线 `3e59500` 注入同源埋点后重新构建，同一把尺子；叠加 4× CPU 降速，p50）：
+- 冷启动实测（CDP 驱动真实 Chromium，每次全新 profile = 真冷缓存；基线 `3e59500` 注入同源埋点后重新构建，同一把尺子；叠加 4× CPU 降速，p50；**目标为 localhost 服务**）：
   - **Slow 4G**（1.5 Mbps/300 ms，10 次）：传输 1026 → 287 KB（−72%）、FCP 7064 → 2464 ms（−65%）、LCP 7560 → 2984 ms（−61%）、可交互 7343 → 2708 ms（−63%）
   - **Fast 4G**（4 Mbps/20 ms，5 次）：传输 1149 → 290 KB（−75%）、FCP 3212 → 1264 ms（−61%）、LCP 3568 → 1772 ms（−50%）、可交互 3436 → 1551 ms（−55%，达成 <2 s 设计指标）
 
+### 生产验收（2026-09-11 21:38 CST 上线，实测于 http://47.109.185.118:3000）
+- **上线动作**：`dist` 打包经 Workbench CLI 上传 → SHA256 双向核对一致（`175f1c43…`）→ `rm -rf dist && unzip` 覆盖 → `systemctl restart quyu`（PID 42802，active）。**无数据库迁移**（v12 未改 `db/`）。回滚包 `backups/dist-before-v8.10.0-20260911-213733.tar.gz`
+- **压缩与缓存头（上线前 → 上线后）**：`index.html` 由无 `content-encoding`、无 `Cache-Control` → `content-encoding: br` + `cache-control: no-cache` + `etag` + `vary: Accept-Encoding`；`/assets/*` → `public, max-age=31536000, immutable`；`Accept-Encoding: identity` 时正确回退裸传
+- **首屏传输量**：单页 HTTP 实测 **1021 KB（裸传）→ 189.5 KB（br，−81.4%）**；同环境 identity 对照 609.4 KB，压缩收益 68.9%。其中入口 `index-DbzxmEpT.js` 52.5 KB、`vendor-react` 52.0 KB、`index--T3A94us.css` 6.4 KB
+- **生产冷启动实测**（CDP + 真实 Chromium，目标为**线上地址**，4× CPU 降速，5 次 p50；含本机→成都真实 RTT）：
+  - **Fast 4G**：TTFB 37 ms、FCP 836 ms、LCP 1684 ms、可交互 **940 ms**、load 631 ms
+  - **Slow 4G**：TTFB 36 ms、FCP 2116 ms、LCP 2416 ms、可交互 2170 ms、load 1904 ms（对比实验室基线 7343 ms，−70%）
+- **埋点闭环打通**：真实浏览器加载线上站点后 `sendBeacon` 上报成功，服务端落盘 `/opt/quyu/logs/perf-2026-09-11.jsonl`（含 ttfb/fcp/lcp/interactive/decodedBytes/dpr/cores/effectiveType 等字段）——**真机采样路径已可正式启用**
+- **回归项**：`/api/perf`（有效样本 204 / 非法 JSON 204 / 无效样本不落盘）、`/api/oauth/nonce` 200、SPA fallback（`/spots`、`/post/123`、`/shop`、`/me` 带 `Accept: text/html` 均回入口 HTML）、未知资源 404、目录穿越 404、`/uploads/*` 206（APK 更新链路完好）、ETag→304 协商命中、`avatar-1.png` 保留名 200。tRPC 全部 `status: ok`（1–2 ms），服务 RSS 92 MB，无 error 日志
+
 ### 说明
 - 提交记录（分支 `v12-app-tuning`，每项一件）：`ab1d23c`(001) `f0b8f3f`(003) `55334be`(002) `689f0f7`(005) `9a19703`(006) `b30489d`(007) `265ec41`(004) `f7f5dbe`(008)；lint 清零另计一件
-- 冷启动数字为**实验室实测**（真实 Chromium + 网络/CPU 节流）。**真机 WebView 采样**受 APK 限制（Capacitor `webContentsDebuggingEnabled` 在 release 构建默认关闭），需部署后按 `docs/perf/真机冷启动测量SOP.md` 走服务端采样路径采集；**下单 P99** 因本机 MySQL 非测试实例未产出可信数字（工具 `scripts/bench-order-p99.ts` 已就绪，待生产侧执行）
+- 冷启动数字均为**实验室实测**（真实 Chromium + 网络/CPU 节流，基线注入同源埋点保证同一把尺子）。**真机 WebView 采样**受 APK 限制（Capacitor `webContentsDebuggingEnabled` 在 release 构建默认关闭，无法直连 DevTools），已改为**服务端采样路径**，并在本次部署后验证打通（真实浏览器上报 → `/opt/quyu/logs/perf-*.jsonl` 落盘）；正式真机数据待按 `docs/perf/真机冷启动测量SOP.md` 采集。**下单 P99** 仍未产出可信数字（本机 MySQL 非测试实例；`scripts/bench-order-p99.ts` 已就绪，建议直接在服务器本地执行以排除网络干扰）
 - 无单测覆盖（`vitest` 配置的 `api/**/*.test.ts` 为空），回归依赖类型检查 + 构建 + 静态门禁 + 冒烟脚本
 
 ## [v8.9.0] - 2026-09-06 「合规三件套补齐 + 版本触达」（迭代计划 v11 全量）
