@@ -6,6 +6,7 @@ import { isNativeApp } from '@/lib/safeArea'
 import { markFirstInteractive } from '@/lib/perf'
 import { MotionFeatures } from '@/providers/motion'
 import UpdateSheet from './UpdateSheet'
+import FloatingBall from './FloatingBall'
 
 /** 模拟状态栏：44px，左「9:41」，右信号/WiFi/电池线性图标，融于页面背景 */
 export function StatusBar({ dark = false }: { dark?: boolean }) {
@@ -169,6 +170,8 @@ export default function Layout() {
             <Outlet />
           </main>
           {showTabBar && <TabBar />}
+          {/* 哪钓 · 水淋淋悬浮球：仅首页挂载，固定右下角、避开 TabBar */}
+          {location.pathname === '/' && <FloatingBall />}
         </div>
         <div className="hidden md:block flex-1" />
         {/* APP 版本检查与更新提示（QY-G-003）：仅原生壳内可能弹出，浏览器静默 */}

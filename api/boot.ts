@@ -29,6 +29,12 @@ app.post(Paths.perf, async (c) => {
   }
   return c.body(null, 204);
 });
+// 哪钓充值 · 支付结果异步回调（微信/支付宝 notify）。
+// TODO(商户号)：接入真实网关后在此验签 → 校验金额/订单号 → 幂等加余额（参考 fishSpot.adminCredit 的事务写法）。
+// 商户号未就绪期间返回 503；充值闭环当前由 PAY_MOCK（开发）或 adminCredit（运营）承担。
+app.post(Paths.payNotify, async (c) => {
+  return c.json({ error: "payment gateway not configured" }, 503);
+});
 // 用户上传目录（头像等）：独立于 dist/public（vite build 的 emptyOutDir 会清空 dist），
 // root "./" 相对 process.cwd()，由 profileService 写入 <cwd>/uploads/avatars。
 app.use("/uploads/*", serveStatic({ root: "./" }));

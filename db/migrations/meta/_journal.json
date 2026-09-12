@@ -78,6 +78,13 @@
       "when": 1788706313921,
       "tag": "0010_pond_applications",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1789185263512,
+      "tag": "0011_fish_spot",
+      "breakpoints": true
     }
   ]
 }

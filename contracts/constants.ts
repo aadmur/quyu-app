@@ -18,4 +18,6 @@ export const Paths = {
   oauthNonce: "/api/oauth/nonce",
   /** 冷启动性能采样上报（QY-PERF-008）：匿名、无需登录，落 JSONL */
   perf: "/api/perf",
+  /** 哪钓充值 · 支付结果异步回调（微信/支付宝 notify，验签后加余额；待商户号接入） */
+  payNotify: "/api/pay/notify",
 } as const;

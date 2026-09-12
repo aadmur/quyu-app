@@ -340,6 +340,52 @@ export const pondApplications = mysqlTable("pond_applications", {
   index("idx_pond_apps_user_status").on(t.userId, t.status),
 ]);
 
+// ============ 哪钓 · 用户余额（预付费，识别按次扣费；单位：分） ============
+export const userBalance = mysqlTable("user_balance", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull().unique(),
+  balanceCents: int("balance_cents").notNull().default(0),
+  // 已用免费识别次数（配合 FISH_SPOT_FREE_LIMIT 的「前 N 次免费」钩子）
+  freeUsed: int("free_used").notNull().default(0),
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
+}, (t) => [
+  index("idx_user_balance_user").on(t.userId),
+]);
+
+// ============ 哪钓 · 充值订单（mock/wechat/alipay/manual） ============
+export const rechargeOrders = mysqlTable("recharge_orders", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  amountCents: int("amount_cents").notNull(),
+  status: varchar("status", { length: 16 }).notNull().default("pending"), // pending/paid/failed
+  provider: varchar("provider", { length: 16 }).notNull().default("mock"), // mock/wechat/alipay/manual
+  outTradeNo: varchar("out_trade_no", { length: 64 }).notNull().unique(),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("idx_recharge_user").on(t.userId, t.createdAt),
+]);
+
+// ============ 哪钓 · 识别台账（计费对账；仅存元数据，不存卡片正文/图片，合规最小化） ============
+export const fishSpotCalls = mysqlTable("fish_spot_calls", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  status: varchar("status", { length: 16 }).notNull(),      // ok / error
+  billing: varchar("billing", { length: 8 }).notNull(),     // free / paid
+  costCents: int("cost_cents").notNull().default(0),        // 向用户收取（免费=0）
+  score: int("score"),                                      // 综合评分（冗余，便于对账/运营）
+  waterType: varchar("water_type", { length: 32 }),
+  promptTokens: int("prompt_tokens").notNull().default(0),
+  completionTokens: int("completion_tokens").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("idx_fishspot_user_created").on(t.userId, t.createdAt),
+]);
+
+export type UserBalance = typeof userBalance.$inferSelect;
+export type RechargeOrder = typeof rechargeOrders.$inferSelect;
+export type FishSpotCall = typeof fishSpotCalls.$inferSelect;
+
 export type Report = typeof reports.$inferSelect;
 export type PondApplication = typeof pondApplications.$inferSelect;
 

@@ -22,6 +22,7 @@ import { listProducts, searchProducts, createProductOrder, myProductOrders, refu
 import { recommendFeed, followingFeed, trackEvent } from "./services/recommendService";
 import { getProfile, updateUserProfile, getProfileOverview } from "./services/profileService";
 import { getVersionInfo } from "./services/appVersion";
+import { getBalance, identify, recharge, adminCredit } from "./services/fishSpot";
 
 /**
  * MVP 演示用户：未登录时以 userId=1 体验完整链路。
@@ -503,6 +504,44 @@ export const featureRouter = createRouter({
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
         return handleReport({ id: ctx.user.id, role: ctx.user.role }, input.reportId, input.action);
+      }),
+  }),
+
+  // ============ 哪钓 · K3 钓点识别 + 预付费余额 ============
+  fishSpot: createRouter({
+    // 余额/免费次数：资金相关，必须真实登录
+    balance: tracedPublic.query(async ({ ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+      return getBalance(ctx.user.id);
+    }),
+    // 拍照识别钓点：先占免费/预扣余额 → 调 K3 → 失败退还 → 成功出卡片
+    identify: tracedPublic
+      .use(rateLimit({ capacity: 30, refillPerSec: 30 / 3600, key: actorKey, message: "识别太频繁，请稍后再试" }))
+      .input(z.object({
+        imageData: z.string().max(6_000_000),
+        latitude: z.number().min(-90).max(90).optional(),
+        longitude: z.number().min(-180).max(180).optional(),
+        locationText: z.string().max(128).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再识别" });
+        return identify(ctx.user.id, input);
+      }),
+    // 充值下单：mock 立即到账；否则建 pending 单（真实拉起待商户号，到账走 Paths.payNotify）
+    recharge: tracedPublic
+      .use(rateLimit({ capacity: 20, refillPerSec: 20 / 3600, key: actorKey, message: "操作太频繁，请稍后再试" }))
+      .input(z.object({ amountCents: z.number().int().min(100).max(100000) }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再充值" });
+        return recharge(ctx.user.id, input.amountCents);
+      }),
+    // 人工加余额（运营兜底，商户号未就绪期间使用）：仅 admin
+    adminCredit: tracedPublic
+      .input(z.object({ targetUserId: z.number(), amountCents: z.number().int().min(1).max(100000) }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "仅限平台管理员" });
+        return adminCredit(input.targetUserId, input.amountCents);
       }),
   }),
 });

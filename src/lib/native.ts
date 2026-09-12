@@ -33,6 +33,37 @@ export async function pickImages(maxCount = 9): Promise<string[]> {
   return pickImagesWeb(maxCount)
 }
 
+/** 拍照/选图单张（哪钓）：原生 Capacitor Camera「拍照/相册」二选一，Web 回退文件选择。
+ *  返回压缩后的 dataURL（最长边 1600px、JPEG 0.82）；用户取消/未授权返回 null。 */
+export async function capturePhoto(): Promise<string | null> {
+  if (isNativeApp() && hasPlugin('Camera')) {
+    try {
+      const { Camera, CameraSource, CameraResultType } = await import('@capacitor/camera')
+      const photo = await withTimeout(
+        Camera.getPhoto({
+          quality: 82,
+          source: CameraSource.Prompt, // 拍照 / 相册 二选一
+          resultType: CameraResultType.Uri,
+          presentationStyle: 'fullscreen',
+          promptLabelHeader: '拍摄钓点',
+          promptLabelPhoto: '从相册选择',
+          promptLabelPicture: '拍照',
+        }),
+        60000,
+      )
+      const url = photo?.webPath
+      if (!url) return null
+      const resp = await fetch(url)
+      const blob = await resp.blob()
+      return await compressImage(blob)
+    } catch {
+      return null // 用户取消或未授权
+    }
+  }
+  const urls = await pickImagesWeb(1)
+  return urls[0] ?? null
+}
+
 /** Web 回退：隐藏文件选择器（移动端浏览器可调起相册/相机） */
 function pickImagesWeb(maxCount: number): Promise<string[]> {
   return new Promise((resolve) => {
