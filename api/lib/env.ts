@@ -29,10 +29,18 @@ export const env = {
   k3Model: process.env.K3_MODEL ?? "kimi-k3",
   /** 开发兜底：true 时不真实调用 K3，返回模拟识别结果（不扣真实额度，但仍走计费闭环） */
   k3Mock: process.env.K3_MOCK === "true",
+  /** 基础档单次调用超时（v12 语义，保持不变） */
+  k3TimeoutMs: optInt("K3_TIMEOUT_MS", 60_000),
+  /** 专家档单步超时：两步累加即端到端预算（设计指标 P95 < 40s → 默认 20s/步） */
+  k3StepTimeoutMs: optInt("K3_STEP_TIMEOUT_MS", 20_000),
 
   // ── 哪钓 · 计费（单位：分） ──
   fishSpotPriceCents: optInt("FISH_SPOT_PRICE_CENTS", 50),
   fishSpotFreeLimit: optInt("FISH_SPOT_FREE_LIMIT", 3),
+  /** QY-SPOT-007 分层定价：专家报告档位价（方案建议 ¥2.00–3.00，默认取下限，可 env 热调） */
+  fishSpotExpertPriceCents: optInt("FISH_SPOT_EXPERT_PRICE_CENTS", 200),
+  /** 专家报告免费体验次数（与基础档免费次数分列记账） */
+  fishSpotExpertFreeLimit: optInt("FISH_SPOT_EXPERT_FREE_LIMIT", 1),
 
   // ── 哪钓 · 充值 ──
   /** true = 充值立即到账（无需真实支付，仅开发/演示；生产必须 false，否则成自助印钞）。
