@@ -2,6 +2,53 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/) 与 [Keep a Changelog](https://keepachangelog.com/zh-CN/) 规范。
 
+## [v8.11.0] - 2026-10-04 「哪钓专业化」（迭代计划 v13，C1~C7 全量）
+
+> 状态：**本地/库级验收全部通过，尚未部署生产**（上线需按 `docs/NEXT-ITERATION.md` 第二节热更新流程 + 应用 0012 迁移，需用户确认）。
+> 主线：把「哪钓」从通用视觉问答升级为垂类专业决策器——**专业结论由知识库规则保证，模型只负责看图与叙述**。
+
+### 输入侧（QY-SPOT-001 / 002，提交 C1）
+- `identify` 入参扩展 8 个**全部可选**字段：`season / waterTemp / airTemp / weather / windLevel / hour / targetFish[] / waterType / clarity`，缺省不阻断（实测：不填任何现场参数可完成专家档识别）。季节缺省按当月推断、时段缺省按当前小时、水温缺省按季节+气温估算（`api/knowledge/fishingRules.ts`）。
+- 前端 `/fish-spot` 拍照区下方新增「补充现场信息」**默认收起**表单（7 组选项 + 水色辅助）；`capturePhoto` 后自动调 `getCurrentPosition()` 补传经纬度（复用 v11 的 12s 硬超时，失败不阻断并提示）。
+- **按需加载**：表单与专业报告各自独立 chunk（br 1.3 / 1.4 KB），实测入口 chunk 内不含任何 v13 新增字符串。
+
+### 知识库与链路（QY-SPOT-003 / 004 / 005 / 011，提交 C2 + C3 + C7）
+- 新增 `api/knowledge/fishingRules.ts`：**34 条**垂类规则（鱼种×季节×水型×流态×水色×结构×水温×时段 → 钓法/线号/钩型/调漂/铅坠/饵料/打窝/策略），含 13 组鱼种别名归一（黄辣丁→黄颡鱼、非洲鲫→罗非鱼等）与 `*` 通用结构规则。**全部标 `reviewStatus:"draft"`，待钓手/你审定**。
+- 新增 `api/knowledge/index.ts`：本地零 token 规则检索（硬过滤 季节/水型/鱼种 + 软加分 流态/水色/结构/水温/时段，`MIN_HIT_SCORE=25`）、Top-N 鱼种多样化、`hasRuleFor` 覆盖率口径。
+- **RAG 三段式**（`api/kimi/k3.ts`）：Step1 视觉特征提取（只观察、禁建议，`FEATURE_SCHEMA`）→ Step2 规则检索 → Step3 结论生成（`EXPERT_SCHEMA`，**不重传图片**，图像 token 只付一次）。Step1 失败/超时降级为空特征，链路不断。
+- **反幻觉兜底是链路级的，不靠提示词**：命中规则时线号/钩型/调漂/铅坠以规则值为准（模型漏写由规则填充）；**未命中时四项具体数值强制清空**并标 `specificsSource:"none"`，前端明示「不提供线号/钩型/调目」。
+- 输出结构化（QY-SPOT-005）：新增 `waterAnalysis / rigSetup / baitPlan / spotPick / suitableFishDetail / bestTimeDetail / knowledgeBasis`；`knowledgeBasis`（规则 id + 命中维度 + 审定状态）**由服务端注入，不经模型**，杜绝编造依据。
+- **兼容取舍**：为满足「老 APK 行为完全不变」，基础档 Schema 与提示词**逐字保持 v12**（实测输出仅 7 字段、`suitableFish` 仍为 `string[]`）；结构化升级只出现在专家档，旧扁平字段同时保留。
+- 热更（QY-SPOT-011）：`FISH_KNOWLEDGE_FILE` 指向 JSON 数组，每次识别 stat 比 mtime，变化重读；解析/校验/字段缺失**整批拒绝并保留旧表**（同 `SENSITIVE_WORDS_FILE` 模式）。
+
+### 分层定价（QY-SPOT-007，提交 C5）
+- `FISH_SPOT_EXPERT_PRICE_CENTS`（默认 200＝¥2.00，方案建议区间下限）+ `FISH_SPOT_EXPERT_FREE_LIMIT`（默认 1 次免费体验）；基础档价与免费额度不变。
+- **两档免费额度分列记账**（`user_balance.expert_free_used`），互不挪用；台账 `fish_spot_calls` 加 `tier / rule_hit / rule_ids / k3_steps` 列（仍不存正文与图片，合规最小化不变）。
+- 失败退还**按所选档位全额**退（付费退该档金额、免费退该档次数）。
+
+### 样本沉淀（QY-SPOT-008，提交 C6）
+- 新增 `fish_spot_samples`（图 + 现场参数 + 特征 + 命中规则 + 报告）与 `fish_spot_feedback`（有用/饵料不符/不准）与 `fish_spot_sample_consents`（授权与撤回）三表，与计费台账**物理分离**。
+- **默认不存图**：仅存在未撤回授权记录时才写样本表（scope=image 落盘 `uploads/spots/`，单张上限 1 MB；scope=features 只存结构化数据）；撤回授权**立即删除本人全部样本与落盘文件**，计费台账与未挂样本 id 的反馈行不受影响。
+- 结果卡新增反馈按钮与授权开关（说明文案含「随时可撤回」「不影响计费记录」）。
+
+### 验证（本机实测，未上线）
+- `tsc -b` → 0 error；`eslint .` → **0 问题**（顺手修掉工作区里 `FloatingBall.tsx` 的 `set-state-in-effect` 违规，改为 `useState` 惰性初始化，恢复 v12 清零基线）
+- 构建门禁：`check-fonts` / `check-images` / `check-perf-wiring` / **`check-knowledge`（新增）** / `check-motion-boundary` / `precompress` 全 PASS
+- **新增知识库门禁** `scripts/check-knowledge.ts`（已接入 build）：规则条数 34、字段完整性、**主流组合覆盖率 100%（48/48，四个水型各 100%）**、**典型场景命中率 100%**、未命中场景正确降级、Top-N 多样化、热更三项（外部文件生效 / 坏文件保留旧表 / 缺字段整批拒绝）
+- **新增哪钓验收脚本** `scripts/verify-fishspot.ts`（`npm run verify:fishspot`）：真实 MySQL 直调服务层，**48 项断言全通过**——含老 APK 形状不变、免费额度分列、按专家价扣费、失败按档全额退还（余额分文不动 + 免费次数退回）、专家档两步链路、专业数值来自规则、未命中清空数值、未授权 0 样本、授权后样本+落盘图、撤回删净且台账不动、**并发 12 次 CAS：成功 5 次＝免费 3＋可付 2，余额不为负**
+- 数据库迁移：`0012_v13_spot_expert.sql`（drizzle 生成）+ `0012_v13_spot_expert_run.sql`（生产直跑幂等版，含 information_schema 守卫）；本机 MySQL 26.7 实测：0000→0012 全量重放 OK，直跑版**重复执行两次不报错**，与 drizzle 版逐列逐索引一致，历史台账行默认回填 `tier='basic'/k3_steps=1`
+- `smoke-static.mjs` 全项通过（56 项，含新增 7 项按需加载断言）
+- 首屏体积：**190.7 KB br**（线上 v8.10.2 实测 189.6 KB，+1.2 KB）。v13 新增代码全部在懒加载 chunk（入口 chunk grep 命中 0），增量来自工作区内**尚未上线的悬浮球改动**（`Layout.tsx` 静态引用 `FloatingBall`）——是否把悬浮球移出首屏闭包请单独定夺
+- 成本口径（⚠️ 估算，非账单实测）：专家档 2 次调用但 Step3 不传图，单次成本仍高于基础档；真实价须以 Moonshot 账单核算后再定专家档最终价
+
+### 待你确认（不影响已实现，改 env 即可）
+1. 专家档最终定价（现为 ¥2.00）与免费体验次数（现为 1）
+2. 知识库 34 条规则的钓手审定（现为 `draft`，前端已显示「待审定初稿」提示）
+3. 存图合规口径：当前实现为「默认不存 + 显式授权 + 可撤回删除」，需你确认是否即为可接受口径
+4. `FISH_KNOWLEDGE_FILE` 热更（服务器文件）还是入库管理（现为文件方式）
+
+
+
 ## [v8.10.2] - 2026-09-12 「图片路径统一到 .webp」
 
 > 状态：**已于 2026-09-12 00:19 (CST) 上线**（数据库迁移 + 代码对齐 + 下线兼容副本）。

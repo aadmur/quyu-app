@@ -156,6 +156,22 @@ try {
     : 0;
   check("自托管字体合计 ≤ 40 KB", kb(fontBytes), (v) => v > 0 && v <= 40, "KB");
 
+  console.log("\n── 哪钓 v13 现场参数表单与专业报告按需加载（QY-SPOT-001/006）──");
+  // 验收线：首屏体积不得回退 → 新增的表单区与报告区必须是独立 chunk，且不被 index.html 静态引用
+  const assetsDir = path.resolve("dist/public/assets");
+  const chunkFiles = fs.readdirSync(assetsDir);
+  for (const name of ["SpotFieldForm", "SpotExpertReport"]) {
+    const chunk = chunkFiles.filter((f) => f.startsWith(`${name}-`) && f.endsWith(".js"));
+    check(`${name} 独立 chunk 存在`, chunk.length > 0, true, chunk[0] ?? "");
+    if (chunk[0]) {
+      check(`${chunk[0]} 未被入口 HTML 静态引用`, html.includes(chunk[0]), false);
+      const brPath = path.join(assetsDir, `${chunk[0]}.br`);
+      const br = fs.existsSync(brPath) ? kb(fs.statSync(brPath).size) : null;
+      check(`${name} chunk br ≤ 12 KB`, br, (v) => v !== null && v <= 12, "KB");
+    }
+  }
+  check("FishSpot 页本身仍为路由级懒加载", chunkFiles.some((f) => /FishSpot-.*\.js$/.test(f)), true);
+
   console.log("\n── 冷启动埋点上报（QY-PERF-008）──");
   // 采样必须「匿名可上报、清洗后落盘、失败也不影响客户端」。
   // 注意落盘目录是 SMOKE_PERF_DIR（见上方 spawn 的 PERF_LOG_DIR），
