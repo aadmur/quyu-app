@@ -1,13 +1,26 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { m, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Camera, ChevronLeft, Loader2, MapPin, RefreshCw, Sparkles, Wallet } from 'lucide-react'
+import { Camera, ChevronDown, ChevronLeft, ChevronUp, Loader2, MapPin, RefreshCw, Sparkles, Wallet } from 'lucide-react'
 import { trpc } from '@/providers/trpc'
 import { useAuthGate } from '@/hooks/useAuthGate'
 import Toast from '@/components/community/Toast'
 import { useToast } from '@/components/community/useToast'
-import { capturePhoto } from '@/lib/native'
-import type { FishSpotResult } from '../../api/kimi/k3'
+import { capturePhoto, getCurrentPosition, type GeoFix } from '@/lib/native'
+import {
+  EMPTY_FIELDS,
+  currentSeason,
+  currentTimeOfDay,
+  fieldsToInput,
+  fieldsTouched,
+  isExpertResult,
+  type SpotFieldValues,
+} from '@/lib/spotFields'
+import type { FishSpotExpertResult, FishSpotResult } from '../../api/kimi/k3'
+
+/** 表单与专业报告按需加载：不进首屏闭包（v13 验收：首屏体积不得回退） */
+const SpotFieldForm = lazy(() => import('@/components/spots/SpotFieldForm'))
+const SpotExpertReport = lazy(() => import('@/components/spots/SpotExpertReport'))
 
 /** 品牌 loading（分支③：非流式 + 水波荡漾动画，替代普通转圈） */
 const LOADING_CSS = `
@@ -41,8 +54,8 @@ function scoreTone(score: number): { text: string; bar: string; label: string } 
 }
 
 /**
- * 哪钓页 /fish-spot：拍照 → 压缩 → K3 识别 → 结构化卡片。
- * 计费：前 N 次免费，之后按次扣余额；余额不足引导充值。
+ * 哪钓页 /fish-spot：拍照 → 现场参数（选填）→ 识别 → 基础结论 + 可折叠专业报告。
+ * 计费：基础档前 N 次免费、之后按次扣余额；专家档独立价与独立免费体验（QY-SPOT-007）。
  */
 export default function FishSpot() {
   const navigate = useNavigate()
@@ -51,9 +64,21 @@ export default function FishSpot() {
 
   const [photo, setPhoto] = useState<string | null>(null)
   const [capturing, setCapturing] = useState(false)
-  const [result, setResult] = useState<FishSpotResult | null>(null)
-  const [lastBilling, setLastBilling] = useState<{ billing: 'free' | 'paid'; costCents: number } | null>(null)
+  const [geo, setGeo] = useState<GeoFix | null>(null)
+  const [result, setResult] = useState<FishSpotResult | FishSpotExpertResult | null>(null)
+  const [resultMeta, setResultMeta] = useState<{
+    billing: 'free' | 'paid'
+    costCents: number
+    tier: 'basic' | 'expert'
+    ruleHit: boolean
+    sampleSaved: boolean
+  } | null>(null)
   const [insufficient, setInsufficient] = useState(false)
+  const [tier, setTier] = useState<'basic' | 'expert'>('basic')
+  const [formOpen, setFormOpen] = useState(false)
+  const [fields, setFields] = useState<SpotFieldValues>(EMPTY_FIELDS)
+  const [reportOpen, setReportOpen] = useState(false)
+  const [feedback, setFeedback] = useState<string | null>(null)
 
   const utils = trpc.useUtils()
   const balanceQ = trpc.app.fishSpot.balance.useQuery(undefined, { enabled: !!user, retry: false })
@@ -62,11 +87,21 @@ export default function FishSpot() {
     () => Math.max(0, (bal?.freeLimit ?? 0) - (bal?.freeUsed ?? 0)),
     [bal],
   )
+  const expertFreeRemaining = Math.max(0, (bal?.expertFreeLimit ?? 0) - (bal?.expertFreeUsed ?? 0))
+  const consentGranted = Boolean(bal?.sampleConsent?.granted)
 
   const identifyMut = trpc.app.fishSpot.identify.useMutation({
     onSuccess: (data) => {
       setResult(data.result)
-      setLastBilling({ billing: data.billing, costCents: data.costCents })
+      setResultMeta({
+        billing: data.billing,
+        costCents: data.costCents,
+        tier: data.tier,
+        ruleHit: data.ruleHit,
+        sampleSaved: data.sampleSaved,
+      })
+      setReportOpen(data.tier === 'expert')
+      setFeedback(null)
       setInsufficient(false)
       utils.app.fishSpot.balance.invalidate()
     },
@@ -81,6 +116,22 @@ export default function FishSpot() {
     },
   })
 
+  const consentMut = trpc.app.fishSpot.sampleConsent.useMutation({
+    onSuccess: () => {
+      utils.app.fishSpot.balance.invalidate()
+      showToast(consentGranted ? '已撤回授权，样本已删除' : '已授权沉淀识别样本')
+    },
+    onError: (e) => showToast(e.message || '操作失败'),
+  })
+
+  const feedbackMut = trpc.app.fishSpot.feedback.useMutation({
+    onSuccess: (_d, v) => {
+      setFeedback(v.rating)
+      showToast('感谢反馈')
+    },
+    onError: (e) => showToast(e.message || '提交失败'),
+  })
+
   const capture = async () => {
     if (!requireAuth('拍照识别钓点')) return
     if (capturing) return
@@ -90,7 +141,12 @@ export default function FishSpot() {
       if (url) {
         setPhoto(url)
         setResult(null)
+        setResultMeta(null)
         setInsufficient(false)
+        // QY-SPOT-002：拍照后自动补传坐标（getCurrentPosition 内部有硬超时，永不卡死）
+        const loc = await getCurrentPosition()
+        setGeo(loc.fix)
+        if (!loc.fix) showToast('未获取到定位，不影响识别')
       }
     } finally {
       setCapturing(false)
@@ -100,11 +156,27 @@ export default function FishSpot() {
   const runIdentify = () => {
     if (!photo || identifyMut.isPending) return
     if (!requireAuth('识别钓点')) return
-    identifyMut.mutate({ imageData: photo })
+    identifyMut.mutate({
+      imageData: photo,
+      tier,
+      ...(geo ? { latitude: geo.latitude, longitude: geo.longitude } : {}),
+      ...fieldsToInput(fields),
+    })
+  }
+
+  const toggleForm = () => {
+    if (formOpen) {
+      setFormOpen(false)
+      return
+    }
+    setFormOpen(true)
+    // 首次展开时按当下时间预置季节与时段（仍可覆盖）
+    if (!fieldsTouched(fields)) setFields({ ...fields, season: currentSeason(), timeOfDay: currentTimeOfDay() })
   }
 
   const tone = result ? scoreTone(result.score) : null
   const identifying = identifyMut.isPending
+  const expert = result && isExpertResult(result) ? result : null
 
   return (
     <div className="relative flex h-full flex-col bg-paper">
@@ -132,13 +204,56 @@ export default function FishSpot() {
       </header>
 
       <div className="flex-1 overflow-y-auto no-scrollbar">
-        {/* 计费提示条 */}
-        <div className="mx-4 mt-3 rounded-xl bg-lake-tint px-4 py-2.5 text-[12px] leading-4 text-lake">
-          {bal
-            ? freeRemaining > 0
-              ? `新用户福利：还可免费识别 ${freeRemaining} 次，之后 ¥${(bal.priceCents / 100).toFixed(2)}/次`
-              : `免费次数已用完，识别 ¥${(bal.priceCents / 100).toFixed(2)}/次，当前余额 ¥${(bal.balanceCents / 100).toFixed(2)}`
-            : '登录后可查看免费次数与余额'}
+        {/* 档位选择（QY-SPOT-007 分层定价） */}
+        <section className="mx-4 mt-3 flex gap-2">
+          <button
+            type="button"
+            onClick={() => setTier('basic')}
+            aria-pressed={tier === 'basic'}
+            className={`flex-1 rounded-xl border px-3 py-2 text-left transition-colors ${
+              tier === 'basic' ? 'border-lake bg-lake-tint' : 'border-line bg-paper-white'
+            }`}
+          >
+            <p className="text-[13px] font-semibold leading-4 text-ink">基础识别</p>
+            <p className="mt-0.5 text-[11px] leading-3 text-ink-40">
+              {bal
+                ? freeRemaining > 0
+                  ? `免费 ${freeRemaining} 次，之后 ¥${(bal.priceCents / 100).toFixed(2)}`
+                  : `¥${(bal.priceCents / 100).toFixed(2)}/次`
+                : '快速结论'}
+            </p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTier('expert')}
+            aria-pressed={tier === 'expert'}
+            className={`flex-1 rounded-xl border px-3 py-2 text-left transition-colors ${
+              tier === 'expert' ? 'border-lake bg-lake-tint' : 'border-line bg-paper-white'
+            }`}
+          >
+            <p className="flex items-center gap-1 text-[13px] font-semibold leading-4 text-ink">
+              专家报告
+              {bal && bal.expertPriceCents > bal.priceCents ? <Sparkles size={12} className="text-lake" /> : null}
+            </p>
+            <p className="mt-0.5 text-[11px] leading-3 text-ink-40">
+              {bal
+                ? expertFreeRemaining > 0
+                  ? `含体验 ${expertFreeRemaining} 次，之后 ¥${(bal.expertPriceCents / 100).toFixed(2)}`
+                  : `¥${(bal.expertPriceCents / 100).toFixed(2)}/次`
+                : '钓组·饵料·水情'}
+            </p>
+          </button>
+        </section>
+
+        {/* 计费与规则库说明 */}
+        <div className="mx-4 mt-2 rounded-xl bg-lake-tint px-4 py-2.5 text-[12px] leading-4 text-lake">
+          {tier === 'expert'
+            ? '专家报告走「看图取特征 → 知识库规则 → 结论」两段链路，专业数值来自规则库，耗时略长'
+            : bal
+              ? freeRemaining > 0
+                ? `新用户福利：还可免费识别 ${freeRemaining} 次，之后 ¥${(bal.priceCents / 100).toFixed(2)}/次`
+                : `免费次数已用完，识别 ¥${(bal.priceCents / 100).toFixed(2)}/次，当前余额 ¥${(bal.balanceCents / 100).toFixed(2)}`
+              : '登录后可查看免费次数与余额'}
         </div>
 
         {/* 拍照区 */}
@@ -155,6 +270,10 @@ export default function FishSpot() {
                 <RefreshCw size={14} strokeWidth={2} />
                 重拍
               </button>
+              <p className="absolute bottom-0 left-0 right-0 flex items-center gap-1 bg-ink/45 px-3 py-1.5 text-[11px] leading-4 text-paper-white">
+                <MapPin size={12} strokeWidth={2} />
+                {geo ? `已带坐标 ${geo.latitude.toFixed(4)}, ${geo.longitude.toFixed(4)}` : capturing ? '定位获取中…' : '未带坐标（不影响识别）'}
+              </p>
             </div>
           ) : (
             <button
@@ -176,6 +295,35 @@ export default function FishSpot() {
           )}
         </section>
 
+        {/* 补充现场信息（默认收起，不影响主流程 — QY-SPOT-001） */}
+        <section className="mx-4 mt-3">
+          <button
+            type="button"
+            onClick={toggleForm}
+            aria-expanded={formOpen}
+            className="flex h-10 w-full items-center justify-between rounded-xl bg-paper-white px-4 text-[13px] font-medium text-ink-60"
+          >
+            <span>
+              补充现场信息
+              {fieldsTouched(fields) && !formOpen ? <span className="ml-1 text-[11px] text-lake">已填</span> : null}
+            </span>
+            {formOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+          <AnimatePresence>
+            {formOpen && (
+              <Suspense
+                fallback={
+                  <div className="mt-3 flex h-12 items-center justify-center rounded-xl bg-paper-white text-[12px] text-ink-40">
+                    表单加载中…
+                  </div>
+                }
+              >
+                <SpotFieldForm value={fields} onChange={setFields} disabled={identifying} />
+              </Suspense>
+            )}
+          </AnimatePresence>
+        </section>
+
         {/* 识别按钮 */}
         <section className="mx-4 mt-4">
           <m.button
@@ -192,7 +340,7 @@ export default function FishSpot() {
             ) : (
               <Sparkles size={18} strokeWidth={2} />
             )}
-            {identifying ? '识别中…' : '开始识别'}
+            {identifying ? '识别中…' : tier === 'expert' ? '生成专家报告' : '开始识别'}
           </m.button>
           {insufficient && (
             <m.button
@@ -272,12 +420,66 @@ export default function FishSpot() {
                     <p className="mt-0.5 text-[13px] leading-5 text-ink-60">{result.warnings}</p>
                   </div>
                 )}
-                {/* 置信度 + 本次计费 */}
-                <div className="flex items-center justify-between border-t border-line pt-3 text-[12px] leading-4 text-ink-40">
+
+                {/* 专家报告折叠区（QY-SPOT-006，按需加载） */}
+                {expert && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setReportOpen((v) => !v)}
+                      aria-expanded={reportOpen}
+                      className="flex h-9 w-full items-center justify-between rounded-xl border border-line px-3 text-[13px] font-medium text-lake"
+                    >
+                      <span>{reportOpen ? '收起专业报告' : '查看专业报告（钓组·饵料·水情）'}</span>
+                      {reportOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </button>
+                    {reportOpen && (
+                      <Suspense
+                        fallback={
+                          <div className="mt-3 flex h-10 items-center justify-center rounded-xl bg-paper text-[12px] text-ink-40">
+                            报告加载中…
+                          </div>
+                        }
+                      >
+                        <SpotExpertReport result={expert} />
+                      </Suspense>
+                    )}
+                  </div>
+                )}
+
+                {/* 反馈（QY-SPOT-008 反馈闭环） */}
+                <div className="flex items-center gap-2 border-t border-line pt-3">
+                  <span className="text-[12px] leading-4 text-ink-40">这条结论有用吗</span>
+                  {[
+                    { key: 'useful', label: '有用' },
+                    { key: 'bait_miss', label: '饵料不符' },
+                    { key: 'inaccurate', label: '不准' },
+                  ].map((o) => (
+                    <button
+                      key={o.key}
+                      type="button"
+                      onClick={() => feedbackMut.mutate({ rating: o.key as 'useful' | 'bait_miss' | 'inaccurate' })}
+                      disabled={feedbackMut.isPending}
+                      className={`rounded-full px-3 py-1 text-[12px] leading-4 ${
+                        feedback === o.key ? 'bg-lake text-paper-white' : 'bg-paper text-ink-60'
+                      }`}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 置信度 + 本次计费 + 规则命中 */}
+                <div className="flex flex-wrap items-center justify-between gap-1 border-t border-line pt-3 text-[12px] leading-4 text-ink-40">
                   <span>识别置信度 {Math.round(result.confidence * 100)}%</span>
-                  {lastBilling && (
+                  {resultMeta?.tier === 'expert' && (
+                    <span>{resultMeta.ruleHit ? '已命中知识库规则' : '未命中规则（已降级）'}</span>
+                  )}
+                  {resultMeta && (
                     <span>
-                      {lastBilling.billing === 'free' ? '本次免费' : `本次扣费 ¥${(lastBilling.costCents / 100).toFixed(2)}`}
+                      {resultMeta.tier === 'expert' ? '专家报告' : '基础识别'} ·{' '}
+                      {resultMeta.billing === 'free' ? '本次免费' : `扣费 ¥${(resultMeta.costCents / 100).toFixed(2)}`}
+                      {resultMeta.sampleSaved ? ' · 样本已沉淀' : ''}
                     </span>
                   )}
                 </div>
@@ -285,6 +487,30 @@ export default function FishSpot() {
             </m.section>
           )}
         </AnimatePresence>
+
+        {/* 样本授权（QY-SPOT-008 合规：默认不存图，显式授权才入样本库） */}
+        {user && (
+          <section className="mx-4 mb-6 rounded-xl bg-paper-white px-4 py-3">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={consentGranted}
+              disabled={consentMut.isPending}
+              onClick={() => consentMut.mutate({ granted: !consentGranted })}
+              className="flex w-full items-center justify-between gap-3 text-left"
+            >
+              <span className="flex-1">
+                <span className="block text-[13px] font-medium leading-4 text-ink">允许沉淀我的识别样本</span>
+                <span className="mt-1 block text-[11px] leading-4 text-ink-40">
+                  用于改进垂类模型。默认关闭；开启后图片与结论会入样本库，随时可撤回并删除。计费记录不受影响。
+                </span>
+              </span>
+              <span className={`h-6 w-10 shrink-0 rounded-full p-0.5 ${consentGranted ? 'bg-lake' : 'bg-[#2d1e1e14]'}`}>
+                <span className={`block h-5 w-5 rounded-full bg-paper-white transition-transform ${consentGranted ? 'translate-x-4' : ''}`} />
+              </span>
+            </button>
+          </section>
+        )}
       </div>
 
       {/* 品牌 loading 覆盖层 */}
@@ -302,7 +528,9 @@ export default function FishSpot() {
               <span />
               <div className="qy-ripple-core" />
             </div>
-            <p className="text-[14px] font-medium leading-5 text-ink-60">AI 正在观察这片水域…</p>
+            <p className="text-[14px] font-medium leading-5 text-ink-60">
+              {tier === 'expert' ? 'AI 正在观察水域并比对专业规则…' : 'AI 正在观察这片水域…'}
+            </p>
           </m.div>
         )}
       </AnimatePresence>
