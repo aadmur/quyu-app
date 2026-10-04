@@ -4,8 +4,29 @@
 
 ## [v8.11.0] - 2026-10-04 「哪钓专业化」（迭代计划 v13，C1~C7 全量）
 
-> 状态：**本地/库级验收全部通过，尚未部署生产**（上线需按 `docs/NEXT-ITERATION.md` 第二节热更新流程 + 应用 0012 迁移，需用户确认）。
+> 状态：**已于 2026-10-04 17:31 (CST) 上线生产**（本地/库级验收 48+56 项全通过后热更新；见下方「部署记录」）。
 > 主线：把「哪钓」从通用视觉问答升级为垂类专业决策器——**专业结论由知识库规则保证，模型只负责看图与叙述**。
+> ⚠️ 生产 `/opt/quyu/.env` **尚未配置 `MOONSHOT_API_KEY`**：识别链路会返回「服务未开通」并**自动全额退还**（不扣钱），
+> 配 Key 后无需重新发版即可生效。
+
+### 部署记录（2026-10-04 17:31 CST）
+- 迁移：`0012_v13_spot_expert_run.sql` 经生产 mysql CLI 执行两次（第二次全 skip，幂等实测）→
+  5 个新列 + 3 张新表到位；历史台账 0 行，默认档位 `basic`
+- 产物：`dist-v8.11.0.tar.gz`（2.5 MB）上传 → **sha256 双向一致** `0569b376…` → 解压暂存并核对结构
+  （boot.js / public/index.html / 37 个 `.br` 变体 / 两个按需 chunk 齐全）→ 原子替换 → `systemctl restart quyu`（active）
+- ⚠️ 踩坑记录：**不能用 PowerShell `Compress-Archive`**——它把条目写成 `public\avatar-1.png` 反斜杠，
+  Linux `unzip` 会解成带反斜杠的扁平文件名导致资源全 404。已在替换脚本里改为 tar.gz + 结构核对 + 暂存后原子移动
+- 线上复核：首屏传输 **189.0 KB**（v8.10.2 同法实测 189.6 KB，−0.6 KB）；入口 chunk 不含 v13 新 UI 字符串；
+  `SpotFieldForm`（1.3 KB）/`SpotExpertReport`（1.4 KB）/`FloatingBall`（2.3 KB）三个按需 chunk 均 200 且含组件代码；
+  图片 `.webp` 与两个保留名 200；`/api/perf` 204；`fish-spot` 路由 SPA 壳 200（需带 `Accept: text/html`，
+  静态中间件只对导航请求做 fallback，这是设计不是 bug）
+- 新过程上线确认：`identify / sampleConsent / feedback / knowledgeStatus / balance` 未登录均返回
+  `UNAUTHORIZED`（而非 `NOT_FOUND`），说明分层与样本接口已注册生效
+- 顺手补 v12 遗留：`/etc/cron.d/quyu` 加 `0 4 * * * root find /opt/quyu/logs -name 'perf-*.jsonl' -mtime +30 -delete`
+  （原文件已备份为 `/etc/cron.d/quyu.bak-before-v13`）
+- **回滚**：`cd /opt/quyu && rm -rf dist && tar xzf backups/dist-before-v8.11.0-20261004-172810.tar.gz && systemctl restart quyu`；
+  库回滚 `gunzip -c backups/quyu-before-v8.11.0-20261004-172810.sql.gz | mysql -uquyu -p<密码> quyu`。
+  新表/新列可留（老代码不读，`tier` 默认 `basic` 不影响对账）
 
 ### 输入侧（QY-SPOT-001 / 002，提交 C1）
 - `identify` 入参扩展 8 个**全部可选**字段：`season / waterTemp / airTemp / weather / windLevel / hour / targetFish[] / waterType / clarity`，缺省不阻断（实测：不填任何现场参数可完成专家档识别）。季节缺省按当月推断、时段缺省按当前小时、水温缺省按季节+气温估算（`api/knowledge/fishingRules.ts`）。
