@@ -22,7 +22,7 @@ import { listProducts, searchProducts, createProductOrder, myProductOrders, refu
 import { recommendFeed, followingFeed, trackEvent } from "./services/recommendService";
 import { getProfile, updateUserProfile, getProfileOverview } from "./services/profileService";
 import { getVersionInfo } from "./services/appVersion";
-import { getBalance, identify, recharge, adminCredit } from "./services/fishSpot";
+import { adminCredit, getBalance, identify, knowledgeStatus, recharge, setSampleConsent, submitFeedback } from "./services/fishSpot";
 
 /**
  * MVP 演示用户：未登录时以 userId=1 体验完整链路。
@@ -522,11 +522,48 @@ export const featureRouter = createRouter({
         latitude: z.number().min(-90).max(90).optional(),
         longitude: z.number().min(-180).max(180).optional(),
         locationText: z.string().max(128).optional(),
+        // QY-SPOT-007 分层：缺省 basic（老 APK 不传，链路逐字不变）
+        tier: z.enum(["basic", "expert"]).optional(),
+        // QY-SPOT-001 现场参数：全部可选，缺省不阻断识别
+        season: z.enum(["春", "夏", "秋", "冬"]).optional(),
+        waterTemp: z.number().min(-5).max(45).optional(),
+        airTemp: z.number().min(-50).max(55).optional(),
+        weather: z.string().max(24).optional(),
+        windLevel: z.number().int().min(0).max(12).optional(),
+        hour: z.number().int().min(0).max(23).optional(),
+        targetFish: z.array(z.string().max(16)).max(6).optional(),
+        waterType: z.string().max(24).optional(),
+        clarity: z.enum(["清澈", "中等", "浑浊", "肥水"]).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再识别" });
         return identify(ctx.user.id, input);
       }),
+    // QY-SPOT-008 样本沉淀授权：默认不存图；撤回即删除本人全部样本（台账不动）
+    sampleConsent: tracedPublic
+      .input(z.object({ granted: z.boolean(), scope: z.enum(["image", "features"]).optional() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+        return setSampleConsent(ctx.user.id, input.granted, input.scope ?? "image");
+      }),
+    // 报告质量反馈（不存图，用于筛选高质量微调样本）
+    feedback: tracedPublic
+      .use(rateLimit({ capacity: 30, refillPerSec: 30 / 3600, key: actorKey, message: "操作太频繁，请稍后再试" }))
+      .input(z.object({
+        rating: z.enum(["useful", "inaccurate", "bait_miss"]),
+        note: z.string().max(200).optional(),
+        sampleId: z.number().int().positive().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+        return submitFeedback(ctx.user.id, input);
+      }),
+    // 知识库运行态（规则来源/条数 + 近 7 日命中率）：仅 admin
+    knowledgeStatus: tracedPublic.query(async ({ ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "仅限平台管理员" });
+      return knowledgeStatus();
+    }),
     // 充值下单：mock 立即到账；否则建 pending 单（真实拉起待商户号，到账走 Paths.payNotify）
     recharge: tracedPublic
       .use(rateLimit({ capacity: 20, refillPerSec: 20 / 3600, key: actorKey, message: "操作太频繁，请稍后再试" }))
