@@ -38,7 +38,10 @@
 - **新增哪钓验收脚本** `scripts/verify-fishspot.ts`（`npm run verify:fishspot`）：真实 MySQL 直调服务层，**48 项断言全通过**——含老 APK 形状不变、免费额度分列、按专家价扣费、失败按档全额退还（余额分文不动 + 免费次数退回）、专家档两步链路、专业数值来自规则、未命中清空数值、未授权 0 样本、授权后样本+落盘图、撤回删净且台账不动、**并发 12 次 CAS：成功 5 次＝免费 3＋可付 2，余额不为负**
 - 数据库迁移：`0012_v13_spot_expert.sql`（drizzle 生成）+ `0012_v13_spot_expert_run.sql`（生产直跑幂等版，含 information_schema 守卫）；本机 MySQL 26.7 实测：0000→0012 全量重放 OK，直跑版**重复执行两次不报错**，与 drizzle 版逐列逐索引一致，历史台账行默认回填 `tier='basic'/k3_steps=1`
 - `smoke-static.mjs` 全项通过（56 项，含新增 7 项按需加载断言）
-- 首屏体积：**190.7 KB br**（线上 v8.10.2 实测 189.6 KB，+1.2 KB）。v13 新增代码全部在懒加载 chunk（入口 chunk grep 命中 0），增量来自工作区内**尚未上线的悬浮球改动**（`Layout.tsx` 静态引用 `FloatingBall`）——是否把悬浮球移出首屏闭包请单独定夺
+- 首屏体积：**189.0 KB br**（线上 v8.10.2 实测 189.6 KB，**低于 v12 基线**）。中途曾量到 190.7 KB，
+  根因是工作区里尚未上线的悬浮球被 `Layout.tsx` 静态引用进了首屏闭包——已改为 `lazy` + `Suspense`
+  （独立 chunk br 2.3 KB，代价是球比首帧晚一个 chunk 才出现）。v13 新增代码全部在懒加载 chunk
+  （入口 chunk 内 grep「补充现场信息/专业报告/SpotFieldForm/fishSpot.identify」命中均为 0）
 - 成本口径（⚠️ 估算，非账单实测）：专家档 2 次调用但 Step3 不传图，单次成本仍高于基础档；真实价须以 Moonshot 账单核算后再定专家档最终价
 
 ### 待你确认（不影响已实现，改 env 即可）
