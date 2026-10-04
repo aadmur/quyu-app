@@ -85,6 +85,13 @@
       "when": 1789185263512,
       "tag": "0011_fish_spot",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1791095554945,
+      "tag": "0012_v13_spot_expert",
+      "breakpoints": true
     }
   ]
 }

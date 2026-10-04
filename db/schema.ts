@@ -347,6 +347,8 @@ export const userBalance = mysqlTable("user_balance", {
   balanceCents: int("balance_cents").notNull().default(0),
   // 已用免费识别次数（配合 FISH_SPOT_FREE_LIMIT 的「前 N 次免费」钩子）
   freeUsed: int("free_used").notNull().default(0),
+  // 已用免费专家报告次数（QY-SPOT-007 分层定价，与基础档免费额度分列记账）
+  expertFreeUsed: int("expert_free_used").notNull().default(0),
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
 }, (t) => [
   index("idx_user_balance_user").on(t.userId),
@@ -373,8 +375,15 @@ export const fishSpotCalls = mysqlTable("fish_spot_calls", {
   status: varchar("status", { length: 16 }).notNull(),      // ok / error
   billing: varchar("billing", { length: 8 }).notNull(),     // free / paid
   costCents: int("cost_cents").notNull().default(0),        // 向用户收取（免费=0）
+  tier: varchar("tier", { length: 8 }).notNull().default("basic"), // basic / expert（QY-SPOT-007）
   score: int("score"),                                      // 综合评分（冗余，便于对账/运营）
   waterType: varchar("water_type", { length: 32 }),
+  /** 知识库是否命中规则（QY-SPOT-003 命中率统计口径；仅布尔元数据，不存规则正文） */
+  ruleHit: boolean("rule_hit"),
+  /** 命中的规则 id 串（逗号分隔，可审计；正文仍不落库） */
+  ruleIds: varchar("rule_ids", { length: 128 }),
+  /** 本次识别步数：基础档 1、专家档 2（成本核算口径） */
+  k3Steps: int("k3_steps").notNull().default(1),
   promptTokens: int("prompt_tokens").notNull().default(0),
   completionTokens: int("completion_tokens").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -382,9 +391,66 @@ export const fishSpotCalls = mysqlTable("fish_spot_calls", {
   index("idx_fishspot_user_created").on(t.userId, t.createdAt),
 ]);
 
+// ============ 哪钓 · 样本存图授权（QY-SPOT-008 合规：默认不存，显式授权才存） ============
+// 与计费台账物理分离：fish_spot_calls 永远不存图与正文，授权状态单列此处。
+export const fishSpotSampleConsents = mysqlTable("fish_spot_sample_consents", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull().unique(),
+  /** 授权范围：image=存原图，features=仅存结构化特征与报告（不含图） */
+  scope: varchar("scope", { length: 16 }).notNull().default("image"),
+  grantedAt: timestamp("granted_at").notNull().defaultNow(),
+  revokedAt: timestamp("revoked_at"),
+}, (t) => [
+  index("idx_spot_consent_user").on(t.userId),
+]);
+
+// ============ 哪钓 · 识别样本（二期 LoRA 微调备料；仅在显式授权下写入） ============
+export const fishSpotSamples = mysqlTable("fish_spot_samples", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  /** 关联台账行（可空：台账写失败不应阻断样本，反之删除样本不得动台账） */
+  callId: int("call_id"),
+  tier: varchar("tier", { length: 8 }).notNull().default("basic"),
+  /** 授权后落盘的样本图路径（/uploads/spots/...）；scope=features 或未存图时为 null */
+  imagePath: varchar("image_path", { length: 255 }),
+  /** 用户提交的现场参数（季节/水温/天气/目标鱼等），JSON */
+  inputs: json("inputs"),
+  /** Step 1 视觉特征，JSON */
+  features: json("features"),
+  /** 命中规则 id 串，便于按规则版本回溯 */
+  ruleIds: varchar("rule_ids", { length: 128 }),
+  /** 最终结构化报告，JSON（微调监督目标） */
+  report: json("report"),
+  /** 样本状态：collected=已入库，labeled=已人工标注，exported=已导出 */
+  status: varchar("status", { length: 16 }).notNull().default("collected"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("idx_spot_sample_user_created").on(t.userId, t.createdAt),
+  index("idx_spot_sample_status").on(t.status),
+]);
+
+// ============ 哪钓 · 报告质量反馈（不存图，用于筛选高质量样本） ============
+export const fishSpotFeedback = mysqlTable("fish_spot_feedback", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  sampleId: int("sample_id"),
+  /** 无样本授权时也可反馈，按台账行关联 */
+  callId: int("call_id"),
+  /** useful=有用 / inaccurate=不准 / bait_miss=饵料或钓组不符实际 */
+  rating: varchar("rating", { length: 16 }).notNull(),
+  note: varchar("note", { length: 200 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("idx_spot_feedback_user").on(t.userId, t.createdAt),
+  index("idx_spot_feedback_rating").on(t.rating),
+]);
+
 export type UserBalance = typeof userBalance.$inferSelect;
 export type RechargeOrder = typeof rechargeOrders.$inferSelect;
 export type FishSpotCall = typeof fishSpotCalls.$inferSelect;
+export type FishSpotSample = typeof fishSpotSamples.$inferSelect;
+export type FishSpotFeedback = typeof fishSpotFeedback.$inferSelect;
+export type FishSpotSampleConsent = typeof fishSpotSampleConsents.$inferSelect;
 
 export type Report = typeof reports.$inferSelect;
 export type PondApplication = typeof pondApplications.$inferSelect;
