@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 /**
@@ -185,14 +185,9 @@ function readPos(): Pos {
 export default function FloatingBall() {
   const navigate = useNavigate()
   const btnRef = useRef<HTMLButtonElement>(null)
-  const [pos, setPos] = useState<Pos>({ x: 0, y: 0 })
+  const [pos, setPos] = useState<Pos>(() => readPos())
   const [dragging, setDragging] = useState(false)
   const drag = useRef({ startX: 0, startY: 0, baseX: 0, baseY: 0, moved: false, active: false })
-
-  // 挂载时恢复上次拖拽位置
-  useEffect(() => {
-    setPos(readPos())
-  }, [])
 
   /** 量取手机壳尺寸（最近定位祖先），用于边缘吸附与边界钳制 */
   const shellRect = () => {
