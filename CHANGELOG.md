@@ -397,7 +397,7 @@ reject；`mockFallback` 之所以看起来"永不成立"，真实原因是 react
 liked/collected**，这属产品口径判断，我没有擅自改。
 
 **产物随之重出**：`bafa1fec8370f7525b43f9ebf98013e7a436be956dc16fe1dcde2b090b424ddd`
-（`E:	mp\dist-v8.12.0-r8.tar.gz`，180 条目 / 44 个 `.br` / 0 反斜杠 / 0 测试文件），
+（`E:\tmp\dist-v8.12.0-r8.tar.gz`，180 条目 / 44 个 `.br` / 0 反斜杠 / 0 测试文件），
 因为本轮动了 `src/` 与 `package.json` —— 按我自己定下的判据（diff 非空才重发），这次就该重发。
 
 
@@ -421,7 +421,7 @@ liked/collected**，这属产品口径判断，我没有擅自改。
   这 2 条是真跑过才留下的：清空后两条 viewer 级缓存都取不到、缓存表为空、空缓存上不抛错。
 
 **重出产物**：`bafa1fec8370f7525b43f9ebf98013e7a436be956dc16fe1dcde2b090b424ddd`
-（`E:	mp\dist-v8.12.0-r8.tar.gz`，180 条目 / 44 个 `.br` / 0 反斜杠 / 0 测试文件；
+（`E:\tmp\dist-v8.12.0-r8.tar.gz`，180 条目 / 44 个 `.br` / 0 反斜杠 / 0 测试文件；
 构建链现在自带 `vitest run`，23/23 通过才产出 dist）。首屏口径复核：eager JS 148.7 KB br、
 CSS 6.44 KB br、按需 `PostContent` 11.96 KB br（仍顶在 12KB 线上、零余量，已登记）。
 
