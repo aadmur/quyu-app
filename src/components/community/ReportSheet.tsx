@@ -36,7 +36,8 @@ interface ReportSheetProps {
 export default function ReportSheet(props: ReportSheetProps) {
   return (
     <AnimatePresence>
-      {props.open ? <ReportForm {...props} /> : null}
+      {/* 条件子元素带 key：AnimatePresence 靠 key 判定"同一个元素被移除"，exit 动画才稳 */}
+      {props.open ? <ReportForm key="report-form" {...props} /> : null}
     </AnimatePresence>
   )
 }
