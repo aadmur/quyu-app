@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { m, AnimatePresence } from 'framer-motion'
-import { X, MessageCircle, Send, ChevronLeft, ChevronRight } from 'lucide-react'
+import { X, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import FishIcon from '@/components/FishIcon'
 import { PROFILE } from '@/data/community'
 import type { CatchItem } from '@/data/community'
@@ -168,7 +168,12 @@ export default function CatchViewer({
                   <MessageCircle size={22} strokeWidth={1.8} />
                   <span className="font-num text-[15px] leading-none">{item.commentCount}</span>
                 </span>
-                <Send size={22} strokeWidth={1.8} />
+                {/*
+                  原先这里摆了一个没有 onClick 的 <Send>：黑底浏览栏里的第三个图标，
+                  外形与左边的点赞钮同规格，用户会当成"分享"去点，点了什么也不发生。
+                  v14 的计划里没有"图片查看器内分享"这项，所以先把这个死 affordance 摘掉，
+                  而不是留个假装能按的图标（要做请补 onShare，见 backlog B-26）。
+                */}
               </div>
             </div>
           </div>
