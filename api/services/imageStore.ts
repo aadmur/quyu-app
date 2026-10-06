@@ -8,8 +8,9 @@
  * `db.select().from(posts)` 全列查询（含 images），一次拉 RECALL_LIMIT=200 条进**进程内 60s 共享缓存**，
  * src/lib/live.ts 的 mapFeedPost 再把 images 全量透传给前端——
  * 等于用 MySQL 当对象存储、用推荐缓存当图床带宽，行数一涨就是 OOM 与首屏流量双杀。
- * 现在链路改成：dataURL 解码 → 机审（imageModeration，落盘前）→ 写磁盘 uploads/<slot>/ →
- * 库里只存 `/uploads/...` URL 字符串数组。
+ * 现在链路改成：dataURL 解码 → 写磁盘 uploads/<slot>/ → 机审（imageModeration，按 /uploads 公网 URL）→
+ * 库里只存 `/uploads/...` URL 字符串数组。审核与写盘的这个先后次序不是偏好，而是被外部约束定死的：
+ * 内容安全的图片接口只接受可被服务端拉取的 URL，不支持 base64（详见 imageModeration 文件头）。
  *
  * 实现风格沿用 profileService.saveDataImage（头像/封面已在线上验证过的模式）：
  * `path.resolve(process.cwd(), 'uploads/<sub>')` + `fs.writeFileSync`，返回 `/uploads/<sub>/<fname>`，
@@ -23,10 +24,11 @@
  * 所以穿越输入面不存在。透传的既有 URL 字符串（编辑帖子时前端会原样带回旧图地址）
  * 只允许同源相对路径，并显式拒绝 `//`（协议相对，会跳出同源）与 `..`/`\`。
  *
- * 已知遗留（不在本期收拾）：磁盘文件可能比库里的引用多，两种情形都会留孤儿文件——
- * (a) 机审通过、写盘成功，但随后的 INSERT 失败；
- * (b) 多图提交里第 5 张被机审 reject 抛错，前 4 张已经落盘（本次发布不会引用它们）。
- * 目前不引入清理任务与回滚 rm（低频 + 单实例磁盘余量大；写路径上 rm 只会新增失败模式）。
+ * 已知遗留（不在本期收拾）：磁盘文件可能比库里的引用多——
+ * 机审通过、写盘成功，但随后的 INSERT 失败，这批文件就成了没人引用的孤儿。
+ * （多图提交里某张被判违规的情形**已经不漏了**：reject 抛错前会把本次新写的文件全部 rm 掉，
+ * 所以"违规图公网可达但库里没有"不会发生；代价是写路径上多了一次 unlink，只在拒绝时走。）
+ * 目前不引入对账清理任务（低频 + 单实例磁盘余量大）。
  * 若要治理：离线按 uploads/{posts,comments} 目录 vs 库内 URL 做一次对账即可，无需改在线链路。
  *
  * ⚠️ 部署约束（落盘方案的前提，换部署方式时必须复核）：`uploads/` 是**运行时数据目录**，
@@ -36,7 +38,7 @@
  * 否则每次发版会把用户历史图片整体清空（库里的 URL 全部 404）。
  */
 import { randomBytes } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { TRPCError } from "@trpc/server";
 import { log } from "../infra";
@@ -77,7 +79,8 @@ export interface IngestedImages {
 
 /**
  * dataURL/URL 混合数组 → 可落库的 URL 数组。
- * 顺序：解码校验 → 机审 → 落盘（审核不过的图片根本不会写盘）。
+ * 顺序：解码校验 → 全部落盘 → 按公网 URL 机审 → 有明确 block 则删掉本次新写的文件并抛错。
+ * （机审必须在落盘之后，是因为内容安全只接受图片 URL、不支持 base64；详见 imageModeration 文件头。）
  *
  * 抛错口径（调用方无需再包 try）：
  * - BAD_REQUEST：超张数/超体积/格式不支持/地址不合法/**机审明确 block**
@@ -135,24 +138,45 @@ export async function ingestImages(
 
   let pendingCount = 0;
   if (decoded.length > 0) {
-    // 机审在落盘之前：图片无需公网可访问（二进制提交），审核不过的一张都不会写盘
-    const outcomes = await moderateImages(decoded.map((d) => d.buf), opts.kind);
+    /**
+     * 顺序是「先全部写盘 → 按公网 URL 机审 → 判违规则删掉本次全部新文件并拒绝发布」。
+     * 之所以不是审核通过才写盘：内容安全的图片接口只接受可被服务端拉取的 URL，不支持 base64
+     * （已由官方文档核实，详见 imageModeration 文件头那段被证伪的记录）。
+     * 因此这里刻意做到：只要有一张被判违规，就把这一批刚落盘的图全删干净再抛错，
+     * 绝不留「公网可访问但库里没有」的孤儿文件。
+     * 未配置机审时 moderateImages 立刻整批返回 unavailable，本段等价于「只写盘、全部待审」，
+     * 与改造前的行为一致（不会多发任何请求）。
+     */
     const dir = ensureDir(opts.slot);
-    decoded.forEach((d, i) => {
+    const written = decoded.map((d) => ({ d, url: writeImage(dir, opts.slot, d, opts.userId) }));
+    const cleanup = () => {
+      for (const w of written) {
+        try {
+          unlinkSync(path.join(dir, path.basename(w.url)));
+        } catch (err) {
+          // 删不掉只可能是并发/权限问题：记下来交人工，不因清理失败而掩盖原本的审核结论
+          log("error", "image store: cleanup after reject failed", { slot: opts.slot, url: w.url, err: String(err) });
+        }
+      }
+    };
+    const outcomes = await moderateImages(written.map((w) => w.url), opts.kind);
+    for (let i = 0; i < written.length; i++) {
+      const w = written[i]!;
       const outcome: ModerateOutcome = outcomes[i] ?? { verdict: "unavailable" };
       if (outcome.verdict === "reject") {
         // 机审已开通却明确 block → fail-closed：这是平台责任边界，不能放行
         log("warn", "image rejected by moderation", {
-          userId: opts.userId, slot: opts.slot, index: d.index, reason: outcome.reason,
+          userId: opts.userId, slot: opts.slot, index: w.d.index, reason: outcome.reason,
         });
+        cleanup();
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `第 ${d.index + 1} 张图片涉嫌违规，请更换后重试`,
+          message: `第 ${w.d.index + 1} 张图片涉嫌违规，请更换后重试`,
         });
       }
       if (outcome.verdict !== "pass") pendingCount++; // review / unavailable 都进人工复核队列
-      slots[d.index] = writeImage(dir, opts.slot, d, opts.userId);
-    });
+      slots[w.d.index] = w.url;
+    }
   }
 
   const urls = slots.filter((u): u is string => typeof u === "string" && u.length > 0);

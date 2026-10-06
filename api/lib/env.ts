@@ -47,12 +47,22 @@ export const env = {
   // 图片照常落盘、帖子/评论照常发布，同时向 reports 写一条 [系统] 待人工复核记录——
   // 即「放行 + 标记待审」而不是拒绝发布。理由：现状本来就没有任何图片机审，
   // fail-closed 会让未开通服务的部署直接丧失发图能力（对照 MOONSHOT_API_KEY 的「服务未开通」降级口径）。
-  // 另：签名实现未经官方 SDK 校正，IMAGE_MODERATION_ENABLED 默认 false，校正后再打开。
+  // ⚠️ 提交方式已由官方文档核实（2026-10-06 复核 help.aliyun.com 的 70292「图片同步检测」与
+  // 53413「公共参数」，以及增强版 2022-03-02 ImageModeration）：两个版本**都只接受可被服务端
+  // 拉取的图片 URL，均不支持 base64 二进制提交**。
+  // 因此机审必须发生在落盘之后（用 /uploads 公网 URL），也因此必须有 PUBLIC_MEDIA_BASE_URL；
+  // 该值未配置时整条机审链路退化为「放行 + 待审」，与未开通时等价。
   aliyunAccessKeyId: process.env.ALICLOUD_ACCESS_KEY_ID ?? "",
   aliyunAccessKeySecret: process.env.ALICLOUD_ACCESS_KEY_SECRET ?? "",
   aliyunGreenEndpoint: process.env.ALICLOUD_GREEN_ENDPOINT ?? "https://green.cn-shanghai.aliyuncs.com",
+  /**
+   * 审核服务端拉图时使用的公网前缀，例：`http://120.x.x.x:3000`（无尾斜杠）。
+   * 必须是**阿里云能访问到**的地址；留空 = 机审不可用（降级为待审，不是报错）。
+   */
+  publicMediaBaseUrl: (process.env.PUBLIC_MEDIA_BASE_URL ?? "").replace(/\/$/, ""),
   /** 控制台创建的业务线，留空 = 用默认通用业务 */
   aliyunGreenBizType: process.env.ALICLOUD_GREEN_BIZ_TYPE ?? "",
+  /** 场景取值 porn/terrorism/ad 已按官方文档核对（该接口另有 live/qrcode/logo） */
   aliyunGreenScenes: process.env.ALICLOUD_GREEN_SCENES ?? "porn,terrorism,ad",
   imageModerationEnabled: process.env.IMAGE_MODERATION_ENABLED === "true",
   /** 单张图片提交超时（并行提交，故一次发布的审核墙钟 ≈ 该值） */

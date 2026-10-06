@@ -2,37 +2,44 @@
  * @layer Application Layer —— ImageModeration（图片内容机审，v14 ADR-0003）
  * @file api/services/imageModeration.ts
  *
- * ⚠️ 本文件有**一处未经真实环境验证**的实现，启用前必须校正，见下方「签名未验证」小节。
- *
- * 为什么机审在落盘之前：
- * 官方文档确认内容安全的图片检测支持 URL 与二进制（base64）两种提交方式，图片**无需公网可访问**，
- * 而本项目生产是内网 IP + `/uploads` 相对路径（见 boot.ts 静态路由），审核服务根本反拉不到图，
- * 所以只能在「客户端 dataURL 已解码成 Buffer、还没写盘」这一刻直接把二进制提交上去——
- * 也顺带避免了「先落盘再审核、审核不过再删文件」的清理工。
+ * ⚠️ 本模块的**提交方式**在 2026-10-06 用官方文档复核后被证伪过一次，教训写在下面，
+ * 因为它是这段代码存在理由的核心：
+ * 我原先的实现是「base64 二进制提交、审核先于写盘」，并在文件头断言
+ * 「官方文档确认内容安全支持 URL 与二进制两种提交方式」。**那句话是错的**——
+ * 复核 help.aliyun.com 的 70292（图片同步检测 2018-05-09）与增强版 2022-03-02 ImageModeration 后，
+ * 两者**都只接受可被服务端拉取的图片 URL**（`tasks[].url` / `ServiceParameters.imageUrl`），
+ * 均不提供 base64 通道。也就是说照旧实现启用后，每一次调用都会 4xx，
+ * 再按本模块的降级口径把全部图片刷进人工复核队列——**看起来"机审已接入"，实际一张都没审成**。
+ * 现改为：**先落盘 → 用 PUBLIC_MEDIA_BASE_URL 拼出公网 URL 提交 → 明确违规则删文件并拒绝发布**。
+ * 代价是一段「违规图短暂公网可达」的窗口（单图超时 3s、整批预算 8s）；
+ * 收益是链路真的能跑通，且未配置时行为与改动前完全等价（见下）。
+ * 教训：写「官方文档确认……」这种句式前必须真的把文档贴到眼前；断言外部能力时给出可核对的出处。
  *
  * ── 决定性设计点：未配置 Key 时的降级路径 = 放行 + 标记待审（不是拒绝） ──
  * 这是产品决策不是技术决策，理由写在这里：
  * 1. 现状本来就没有任何图片机审。贸然 fail-closed，等于用一次后端改动把「发图」这个核心动作
- *    变成「必须先在阿里云开通内容安全并配好 AK」的硬前置——用户会彻底发不了图。
+ *    变成「必须先在阿里云开通内容安全并配好 AK + 公网地址」的硬前置——用户会彻底发不了图。
  * 2. 项目对「外部能力未开通」的既有口径也是这样处理的：MOONSHOT_API_KEY 未配置时，
  *    哪钓识别返回「服务暂未开通」并全额退还（见 fishSpot.ts 的 no-key 分支）——
  *    也就是「功能降级 + 明确记账」，而不是把错误甩成用户不可用。
- * 3. 因此未配置/未启用/调用失败/超时/签名被拒，一律判为 unavailable：图片照常落盘、
+ * 3. 因此未配置/未启用/未配公网地址/调用失败/超时/签名被拒，一律判为 unavailable：图片照常落盘、
  *    帖子照常发布，同时向 reports 写一条 [系统] 前缀的人工复核记录（与 contentFilter 的
  *    广告词 flag 同一套队列与同一套幂等约定），让「机审缺位」转成「人工兜底」而不是「静默放过」。
- * 4. 反过来，一旦机审明确给出 block 判定，就是 fail-closed 抛错拒绝发布——
+ * 4. 反过来，一旦机审明确给出 block 判定，就是 fail-closed 删文件 + 拒绝发布——
  *    已开通服务却仍放行违规图，责任在平台。
  *
  * 可靠性：审核链路自身任何异常都不得阻断发布。每次 HTTP 有独立超时，整个批次再有一个总预算兜底
  * （fetch 不 honor abort 的极端情况下也能脱出），失败只记日志 + 转人工队列。
  *
- * ── 签名未验证（TODO 必读） ──
- * callGreenScan 里的 ROA v1 签名（StringToSign 各行顺序、CanonicalizedHeaders/Resource 规则）、
- * 以及请求体 images[].content 是否就是 base64 提交字段名，**均未与官方 SDK 对照验证**
- * （开发机没有 AK、也没有联调条件）。签名错误会表现为 4xx → 按上面的口径降级为 unavailable，
- * 不会误伤发布，但会把图片刷进人工审核队列。因此 IMAGE_MODERATION_ENABLED 默认 false：
- * TODO(签名校正)：启用前用官方 SDK（@alicloud/green20220302 或内容安全控制台示例）逐字校正
- *   buildStringToSign / buildRequestBody，并在预发环境用一张正常图 + 一张违规图各跑通一次。
+ * ── 签名：规则已按文档校正，但仍**未经真实网关联调** ──
+ * 已按 53413「公共参数」+ ROA 签名规范逐条对齐：Content-MD5 是标准 base64（**不得大写**，
+ * 我旧实现 `.toUpperCase()` 是错的）、必发 `x-acs-version: 2018-05-09` /
+ * `x-acs-signature-nonce` / `x-acs-signature-version: 1.0` / `x-acs-signature-method: HMAC-SHA1`
+ * （旧实现一个都没发，必被拒），且这些头要进 CanonicalizedHeaders 参与签名。
+ * 仍未验证的两点：`bizType` 的确切位置（文档示例未覆盖，默认留空不发送），以及真实网关对
+ * 同一请求的签名判定。IMAGE_MODERATION_ENABLED 因此**默认 false**，
+ * TODO(联调)：拿到 AK 后先用一张正常图 + 一张违规图各跑一次真实调用，确认 signature 通过、
+ *   且 block 分支确实回到 reject；公网地址必须让阿里云侧可达（内网/防火墙会表现为拉图失败）。
  * 计费口径：按量付费通用版约 $0.6/千次（一张图一次），成本量级 = 发帖图片总数，可忽略；
  *   真正需要盯的是「审核失败刷人工队列」的人工成本，故失败次数在本模块按分钟节流告警。
  */
@@ -63,13 +70,15 @@ const cfg = {
   accessKeySecret: env.aliyunAccessKeySecret,
   /** 内容安全（绿网）区域 endpoint；换区只改这一项 */
   endpoint: env.aliyunGreenEndpoint.replace(/\/$/, ""),
+  /** 审核服务端拉图的公网前缀；空串 = 无法用 URL 提交，整链路降级 */
+  mediaBaseUrl: env.publicMediaBaseUrl,
   /** 业务线（控制台创建后得到，留空用默认通用业务） */
   bizType: env.aliyunGreenBizType,
-  /** 检测场景：涉黄 + 涉政暴恐 + 广告，逗号分隔 */
+  /** 检测场景：涉黄 + 涉政暴恐 + 广告，逗号分隔（取值已按官方文档核对） */
   scenes: env.aliyunGreenScenes.split(",").map((s) => s.trim()).filter(Boolean),
   /**
-   * 总开关。**默认 false**——签名未校正前打开只会把图片全量刷进人工队列（见文件头 TODO）。
-   * 未开启（或未配 AK/Secret）时行为 = 「放行 + 标记待审」，与本次改动前的现状等价，
+   * 总开关。**默认 false**——签名规则虽已按文档校正，但还没打过真实网关（见文件头 TODO(联调)）。
+   * 未开启（或未配 AK/Secret、或未配公网地址）时行为 = 「放行 + 标记待审」，与本次改动前的现状等价，
    * 只是多了一条人工复核记录；绝不会拒绝发帖。
    */
   enabled: env.imageModerationEnabled,
@@ -79,22 +88,30 @@ const cfg = {
   deadlineMs: env.imageModerationDeadlineMs,
 };
 
-/** AK/Secret 齐备且显式启用才算「可用」；否则整条链路走降级（不发 HTTP，零成本零延迟） */
+/** 失效原因（空串=可用）。URL 提交必须有公网前缀，否则连请求都发不出去，这是硬性前提 */
+function inactiveReason(): string {
+  if (!cfg.enabled) return "IMAGE_MODERATION_ENABLED!=true";
+  if (!(cfg.accessKeyId && cfg.accessKeySecret)) return "未配置 ALICLOUD_ACCESS_KEY_ID/SECRET";
+  if (!cfg.mediaBaseUrl) return "未配置 PUBLIC_MEDIA_BASE_URL（机审只能按图片 URL 提交）";
+  return "";
+}
+
+/** AK/Secret 齐备 + 显式启用 + 有公网前缀才算「可用」；否则整条链路走降级（不发 HTTP，零成本零延迟） */
 export function isModerationConfigured(): boolean {
-  return cfg.enabled && Boolean(cfg.accessKeyId && cfg.accessKeySecret);
+  return inactiveReason() === "";
 }
 
 /** 运营自查/后台展示用（不参与判定逻辑） */
 export function moderationConfigState() {
-  const hasKey = Boolean(cfg.accessKeyId && cfg.accessKeySecret);
+  const reason = inactiveReason();
   return {
     enabled: cfg.enabled,
-    hasKey,
-    active: isModerationConfigured(),
+    hasKey: Boolean(cfg.accessKeyId && cfg.accessKeySecret),
+    active: reason === "",
     endpoint: cfg.endpoint,
     scenes: cfg.scenes,
     /** 未生效的原因文案：便于我在服务器日志里一眼看出该补哪一项 */
-    inactiveReason: !hasKey ? "未配置 ALICLOUD_ACCESS_KEY_ID/SECRET" : !cfg.enabled ? "IMAGE_MODERATION_ENABLED!=true" : "",
+    inactiveReason: reason,
   };
 }
 
@@ -102,30 +119,32 @@ export function moderationConfigState() {
 
 /**
  * 批量机审：并行提交（串行会把 9 图预算累加成一个发布请求的分钟级延迟）。
+ * 入参是**已落盘图片的同源相对路径**（`/uploads/posts/xxx.jpg`），本模块自己拼公网 URL——
+ * 内容安全只接受可被服务端拉取的图片 URL，所以调用方必须"先写盘再来审核"。
  * 返回值与入参一一对应；服务不可用时不抛错，只给 unavailable，由调用方决定后续动作。
  */
-export async function moderateImages(buffers: Buffer[], kind: "post" | "comment"): Promise<ModerateOutcome[]> {
-  if (buffers.length === 0) return [];
+export async function moderateImages(relativeUrls: string[], kind: "post" | "comment"): Promise<ModerateOutcome[]> {
+  if (relativeUrls.length === 0) return [];
   if (!isModerationConfigured()) {
     // 降级主路径：一条日志说清「为什么没审」，避免上线后误以为机审已生效
     logThrottledWarn("image moderation disabled, passthrough + manual queue", {
       kind,
-      count: buffers.length,
-      why: moderationConfigState().inactiveReason,
+      count: relativeUrls.length,
+      why: inactiveReason(),
     });
-    return buffers.map(() => ({ verdict: "unavailable", reason: moderationConfigState().inactiveReason || "not-configured" }));
+    return relativeUrls.map(() => ({ verdict: "unavailable", reason: inactiveReason() || "not-configured" }));
   }
 
-  const settled = Promise.all(buffers.map((buf) => moderateOne(buf, kind)));
+  const settled = Promise.all(relativeUrls.map((url) => moderateOne(url, kind)));
   // 总预算兜底：超时后未决的位补 unavailable（已决的保留原判定，不因慢图丢快图的结论）
-  const guarded = await withDeadline(settled, buffers.length, cfg.deadlineMs);
+  const guarded = await withDeadline(settled, relativeUrls.length, cfg.deadlineMs);
   return guarded;
 }
 
 /** 单张：把 HTTP 异常/超时/非 2xx 全部折叠成 unavailable，判定异常绝不外抛给发布链路 */
-async function moderateOne(buf: Buffer, kind: "post" | "comment"): Promise<ModerateOutcome> {
+async function moderateOne(relativeUrl: string, kind: "post" | "comment"): Promise<ModerateOutcome> {
   try {
-    return await callGreenScan(buf, kind);
+    return await callGreenScan(`${cfg.mediaBaseUrl}${relativeUrl}`, kind);
   } catch (err) {
     logThrottledWarn("image moderation call failed, degrade to manual review", { kind, err: String(err) });
     return { verdict: "unavailable", reason: String(err).slice(0, 200) };
@@ -163,18 +182,13 @@ interface GreenScanResponse {
 }
 
 /**
- * POST {endpoint}/green/image/scan —— 二进制（base64）提交单图。
- *
- * TODO(签名校正)：下面 buildStringToSign 是按阿里云 ROA v1 通用规则（METHOD/Accept/
- * Content-MD5/Content-Type/Date + CanonicalizedHeaders + CanonicalizedResource，
- * HMAC-SHA1 后 base64，Authorization: acs <AK>:<Signature>）手写的，
- * **没有与官方 SDK 或真实网关对照验证过**（本机无 AK、无联调条件）。
- * 同样未验证的还有：images[].content 是否为 base64 提交时的字段名、scenes 取值是否含 "ad"。
- * 启用前必须按官方文档/SDK 逐字校正。签名错误的后果是 4xx → 走降级，不影响发布可用性。
+ * POST {endpoint}/green/image/scan —— 按图片 URL 提交单图。
+ * 请求体形态 `{"scenes":[...],"tasks":[{"dataId","url"}]}` 与 scenes 取值
+ * 均已按官方 70292 文档核对；`bizType` 的位置文档示例未覆盖，故仅在显式配置时发送（默认不发）。
  */
-async function callGreenScan(buf: Buffer, kind: "post" | "comment"): Promise<ModerateOutcome> {
+async function callGreenScan(absoluteImageUrl: string, kind: "post" | "comment"): Promise<ModerateOutcome> {
   const path = "/green/image/scan";
-  const body = buildRequestBody(buf, kind);
+  const body = buildRequestBody(absoluteImageUrl, kind);
   const payload = JSON.stringify(body);
   const headers = signedHeaders("POST", path, payload);
 
@@ -198,48 +212,66 @@ async function callGreenScan(buf: Buffer, kind: "post" | "comment"): Promise<Mod
   }
 }
 
-/** 请求体：二进制提交（图片无需公网可访问，这是本模块选它而非 URL 提交的原因） */
-function buildRequestBody(buf: Buffer, kind: "post" | "comment"): Record<string, unknown> {
-  const body: Record<string, unknown> = {
-    scenes: cfg.scenes,
-    images: [{ content: buf.toString("base64") /* TODO(签名校正)：字段名待与官方 SDK 对照 */ }],
+/** 请求体：URL 提交（内容安全不提供 base64 通道，见文件头那段被证伪的记录） */
+function buildRequestBody(absoluteImageUrl: string, kind: "post" | "comment"): Record<string, unknown> {
+  const task: Record<string, unknown> = {
+    // dataId 不参与审核逻辑，只为在人工复核队列/控制台日志里认出这张图的来源
+    dataId: `${kind}-${Date.now()}-${randomBytes(4).toString("hex")}`,
+    url: absoluteImageUrl,
   };
-  if (cfg.bizType) body.bizType = cfg.bizType;
-  // 人工复核队列里要能看出这张图的来源，dataId 不参与审核逻辑，只回显
-  body.dataId = `${kind}-${Date.now()}-${randomBytes(4).toString("hex")}`;
-  return body;
+  if (cfg.bizType) task.bizType = cfg.bizType;
+  return { scenes: cfg.scenes, tasks: [task] };
 }
 
 /**
- * ROA v1 签名头集合（未验证，见 callGreenScan 的 TODO）。
- * 只对本实现需要的头做规范化：Accept / Content-MD5 / Content-Type / Date，无 x-acs-* 扩展头。
+ * ROA v1 签名头集合。必发头与取值按 53413「公共参数」核对：
+ * Accept / Content-Type / Date / x-acs-version / x-acs-signature-nonce /
+ * x-acs-signature-version / x-acs-signature-method / Authorization，Content-MD5 用 HMAC-SHA1 时必发。
  */
 function signedHeaders(method: string, path: string, payload: string): Record<string, string> {
   const accept = "application/json";
   const contentType = "application/json";
-  const contentMd5 = `${createHash("md5").update(payload, "utf8").digest("base64")}`.toUpperCase();
+  /** 标准 base64，**不能大写**：大写后的串与网关自己算出的 MD5 不同，会直接判体不符 */
+  const contentMd5 = createHash("md5").update(payload, "utf8").digest("base64");
   const date = new Date().toUTCString();
-  const stringToSign = buildStringToSign(method, accept, contentMd5, contentType, date, path);
+  const acsHeaders: Record<string, string> = {
+    "x-acs-signature-method": "HMAC-SHA1",
+    "x-acs-signature-nonce": randomBytes(16).toString("hex"),
+    "x-acs-signature-version": "1.0",
+    "x-acs-version": "2018-05-09",
+  };
+  const stringToSign = buildStringToSign(method, accept, contentMd5, contentType, date, acsHeaders, path);
   const signature = createHmac("sha1", cfg.accessKeySecret).update(stringToSign, "utf8").digest("base64");
   return {
     Accept: accept,
     "Content-Type": contentType,
     "Content-MD5": contentMd5,
     Date: date,
+    ...acsHeaders,
     Authorization: `acs ${cfg.accessKeyId}:${signature}`,
   };
 }
 
-/** ROA 待签字符串（各段以 \n 分隔；无 x-acs-* 头时 CanonicalizedHeaders 为空串） */
+/**
+ * ROA 待签字符串：METHOD\nAccept\nContent-MD5\nContent-Type\nDate\n
+ * 然后是按头名升序排列的 CanonicalizedHeaders（每行 `name:value\n`，name 全小写），
+ * 最后接 CanonicalizedResource（本接口无查询参数，即路径本身）。
+ */
 function buildStringToSign(
   method: string,
   accept: string,
   contentMd5: string,
   contentType: string,
   date: string,
+  acsHeaders: Record<string, string>,
   resource: string,
 ): string {
-  return `${method.toUpperCase()}\n${accept}\n${contentMd5}\n${contentType}\n${date}\n${resource}`;
+  const canonicalHeaders = Object.entries(acsHeaders)
+    .map(([k, v]) => [k.toLowerCase(), v] as const)
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .map(([k, v]) => `${k}:${v}\n`)
+    .join("");
+  return `${method.toUpperCase()}\n${accept}\n${contentMd5}\n${contentType}\n${date}\n${canonicalHeaders}${resource}`;
 }
 
 /**
