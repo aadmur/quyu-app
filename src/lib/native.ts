@@ -74,7 +74,18 @@ function pickImagesWeb(maxCount: number): Promise<string[]> {
     input.onchange = async () => {
       const files = Array.from(input.files ?? []).slice(0, maxCount)
       const out: string[] = []
-      for (const f of files) out.push(await compressImage(f))
+      // 必须逐张 try/catch：compressImage 里的 createImageBitmap 遇到损坏文件或非图片
+      // 会 reject。一旦让它冒出来，下面的 resolve 就永远执行不到 —— 外层 await 永久挂起，
+      // 调用方「正在选择」的状态回不来，按钮卡死且无法重试。
+      // 原先只有发布页走这条路，v14 把评论配图也接了上来，等于把这个静默挂死
+      // 从一处扩到两处（见 backlog B-20）。
+      for (const f of files) {
+        try {
+          out.push(await compressImage(f))
+        } catch {
+          // 单张坏图就跳过它：不整体失败，也不伪造占位图混进用户的相册结果
+        }
+      }
       resolve(out)
     }
     input.oncancel = () => resolve([])

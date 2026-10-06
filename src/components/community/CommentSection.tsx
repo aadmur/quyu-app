@@ -524,13 +524,18 @@ export default function CommentSection({
           <button
             type="button"
             // 只在这里把暂存的 nextCursor 提升为 cursor：effect 里直接 setCursor 会让
-            // 「加载更多」变成自动连翻（与楼内 CommentReplies 同款双状态）
-            onClick={() => patchStream(sort, (s) => ({ ...s, cursor: s.nextCursor }))}
+            // 「加载更多」变成自动连翻（与楼内 CommentReplies 同款双状态）。
+            // 若游标已经等于「在请求里的那个」，说明上一页是失败回来的 —— 这时再写同一个值
+            // 不会改变 query key，react-query 根本不重发，按钮就成死按钮，必须改走 refetch。
+            onClick={() => {
+              if (stream.cursor !== stream.nextCursor) patchStream(sort, (s) => ({ ...s, cursor: s.nextCursor }))
+              else void commentsQuery.refetch()
+            }}
             disabled={commentsQuery.isFetching}
             className="mb-1 flex h-9 w-full items-center justify-center gap-1 rounded-lg text-[13px] leading-[18px] text-olive disabled:opacity-40"
           >
             {commentsQuery.isFetching ? <Loader2 size={15} className="animate-spin" /> : null}
-            加载更多评论
+            {commentsQuery.isError ? '重试加载评论' : '加载更多评论'}
           </button>
         )}
       </section>
