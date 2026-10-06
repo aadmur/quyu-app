@@ -328,8 +328,8 @@ reject；`mockFallback` 之所以看起来"永不成立"，真实原因是 react
   「阿里云侧是否判定同一签名」只有配上 AK 才能确认；`bizType` 的确切位置文档示例未覆盖，
   因此默认留空不发送。`IMAGE_MODERATION_ENABLED` 保持 `false`。
 - **⚠️ 这一节让已上传的部署物过期**：`api/` 变了，`/root/dist-v8.12.0.tar.gz`（`ca1c4a00…4532f`）
-  必须替换为新产物 `0d11049941b914de99880b04c933689eb381f06b093bfdafe88c5ee81d6e355b`
-  （本地 `E:\tmp\dist-v8.12.0-r7.tar.gz`），并重出 `SHA_EXPECTED`。
+  必须替换为新产物 `bafa1fec8370f7525b43f9ebf98013e7a436be956dc16fe1dcde2b090b424ddd`
+  （本地 `E:\tmp\dist-v8.12.0-r8.tar.gz`），并重出 `SHA_EXPECTED`。
   新产物已复核：180 条目 / **44 个 `.br`** / **0 条反斜杠路径** / **0 处 `data-dbg`**，
   且 bundle 内确认 `2018-05-09`、`HMAC-SHA1`、`/green/image/scan` 就位，
   `images:[…]` base64 通道与 MD5 大写两处缺陷已消失。
@@ -396,8 +396,8 @@ reject；`mockFallback` 之所以看起来"永不成立"，真实原因是 react
 门禁 4/4 仍成立，但盲区是真的）；react-query 缓存 key 不含用户 id 且登出不清缓存 → **换账号可能脏读自己的
 liked/collected**，这属产品口径判断，我没有擅自改。
 
-**产物随之重出**：`0d11049941b914de99880b04c933689eb381f06b093bfdafe88c5ee81d6e355b`
-（`E:	mp\dist-v8.12.0-r7.tar.gz`，180 条目 / 44 个 `.br` / 0 反斜杠 / 0 测试文件），
+**产物随之重出**：`bafa1fec8370f7525b43f9ebf98013e7a436be956dc16fe1dcde2b090b424ddd`
+（`E:	mp\dist-v8.12.0-r8.tar.gz`，180 条目 / 44 个 `.br` / 0 反斜杠 / 0 测试文件），
 因为本轮动了 `src/` 与 `package.json` —— 按我自己定下的判据（diff 非空才重发），这次就该重发。
 
 
@@ -420,8 +420,8 @@ liked/collected**，这属产品口径判断，我没有擅自改。
   `getQueryCache()` 返回 QueryCache 对象而非数组，`toHaveLength` 无从落下，改为 `.getAll()`。
   这 2 条是真跑过才留下的：清空后两条 viewer 级缓存都取不到、缓存表为空、空缓存上不抛错。
 
-**重出产物**：`0d11049941b914de99880b04c933689eb381f06b093bfdafe88c5ee81d6e355b`
-（`E:	mp\dist-v8.12.0-r7.tar.gz`，180 条目 / 44 个 `.br` / 0 反斜杠 / 0 测试文件；
+**重出产物**：`bafa1fec8370f7525b43f9ebf98013e7a436be956dc16fe1dcde2b090b424ddd`
+（`E:	mp\dist-v8.12.0-r8.tar.gz`，180 条目 / 44 个 `.br` / 0 反斜杠 / 0 测试文件；
 构建链现在自带 `vitest run`，23/23 通过才产出 dist）。首屏口径复核：eager JS 148.7 KB br、
 CSS 6.44 KB br、按需 `PostContent` 11.96 KB br（仍顶在 12KB 线上、零余量，已登记）。
 
@@ -441,6 +441,10 @@ CSS 6.44 KB br、按需 `PostContent` 11.96 KB br（仍顶在 12KB 线上、零�
 裸跑 prettier 归一 `ReportSheet` 缩进，结果它给全文件加分号、把 JS 字符串改成双引号。
 现在补了 `.prettierrc.json`，**只写我有直接证据的两条**（`semi:false` / `singleQuote:true`），
 `printWidth` 之类没有把握的不写——凭空定一个宽度会让下一次全量格式化的改动面无法预料。
+
+
+- **诚实交代验证边界（我这一轮改不了的那部分）**：本轮重构了三处只有真实浏览器/真机才能验行为的东西——`ReportSheet` 的挂载边界（跨次残留的修复）、关注态的 state 口径（派生 + 乐观覆盖位）、登录/登出时的 `resetViewerCache`。浏览器自动化在当前策略下不可用，仓库没有 jsdom 且本机无 npm 装不了，DOM 级测试落不了地，所以它们目前只有 tsc/eslint/23 条单测这层静态证据。具体点哪三下、期望结果是什么，写在 `docs/NEXT-ITERATION.md` 的「本轮改了、但我没能运行时验证的三条」表格里；不对就走部署脚本的 `--rollback`（迁移幂等，回滚码不动库）。
+  顺带给条件子元素补了 `key` —— 让 AnimatePresence 的退场判定不要依赖「单个条件子元素恰好没 key 也能工作」这种巧合。
 
 ## [v8.11.0] - 2026-10-04 「哪钓专业化」（迭代计划 v13，C1~C7 全量）
 
