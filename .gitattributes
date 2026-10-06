@@ -1,0 +1,5 @@
+# 部署/验收用的 shell 脚本必须在任何平台上都以 LF 落盘：
+# 本机 core.autocrlf=true，checkout 时会把 LF 转成 CRLF，而带 CRLF 的 bash 脚本在 Linux 上
+# 会以难以察觉的方式失败（`set -euo pipefail\r`、变量值尾部带 \r）。
+# v14 的上线交接要求这些脚本能原样上传到服务器直接跑，所以在这里钉死。
+*.sh text eol=lf
