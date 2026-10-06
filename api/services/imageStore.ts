@@ -70,6 +70,13 @@ export const IMAGE_SLOT_LIMITS: Record<ImageSlot, SlotLimits> = {
 const DATA_IMAGE_RE = /^data:image\/(png|jpeg|jpg|webp);base64,(.+)$/;
 const EXT_BY_MIME: Record<string, string> = { png: "png", jpeg: "jpg", jpg: "jpg", webp: "webp" };
 
+/** 解码阶段的中转形状：index 是**入参数组的原下标**（混排旧图时要按用户所选顺序回填） */
+interface Decoded {
+  index: number;
+  buf: Buffer;
+  ext: string;
+}
+
 export interface IngestedImages {
   /** 写进 posts.images / comments.images 的 URL 数组（保持入参顺序） */
   urls: string[];
@@ -99,7 +106,6 @@ export async function ingestImages(
 
   // 结果按原下标占位，保证「旧图 + 新图」混排时顺序与用户所选一致
   const slots: (string | undefined)[] = new Array(list.length).fill(undefined);
-  interface Decoded { index: number; buf: Buffer; ext: string }
   const decoded: Decoded[] = [];
   let totalBytes = 0;
 
@@ -148,7 +154,7 @@ export async function ingestImages(
      * 与改造前的行为一致（不会多发任何请求）。
      */
     const dir = ensureDir(opts.slot);
-    const written = decoded.map((d) => ({ d, url: writeImage(dir, opts.slot, d, opts.userId) }));
+    const written: { d: Decoded; url: string }[] = [];
     const cleanup = () => {
       for (const w of written) {
         try {
@@ -159,9 +165,19 @@ export async function ingestImages(
         }
       }
     };
+    try {
+      for (const d of decoded) written.push({ d, url: writeImage(dir, opts.slot, d, opts.userId) });
+    } catch (err) {
+      /**
+       * 写盘中途失败（磁盘满 / IO 错误）时，前面几张已经落到公网目录了。
+       * 不清掉就会留下「公网能访问、库里永远不会引用」的文件——和 reject 分支同一形态的孤儿，
+       * 只是诱因不同。清理后原样抛出，保持 writeImage 自己的 500 口径不变。
+       */
+      cleanup();
+      throw err;
+    }
     const outcomes = await moderateImages(written.map((w) => w.url), opts.kind);
-    for (let i = 0; i < written.length; i++) {
-      const w = written[i]!;
+    for (const [i, w] of written.entries()) {
       const outcome: ModerateOutcome = outcomes[i] ?? { verdict: "unavailable" };
       if (outcome.verdict === "reject") {
         // 机审已开通却明确 block → fail-closed：这是平台责任边界，不能放行

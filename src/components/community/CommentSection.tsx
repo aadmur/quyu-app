@@ -301,7 +301,10 @@ export default function CommentSection({
   }
 
   const onCommentLike = (c: CommentView) => {
-    if (c.deleted || likeBusy != null) return
+    // 只挡「同一颗按钮的连点」：likeBusy 是单值，若用它挡住全部评论，
+    // 一条在途期间其它评论的点赞会被静默吞掉（按钮看着能点、点了没反应），
+    // 与 118-119 行「只禁用被点的那一颗」的口径相反。不同评论互不依赖，可以并发。
+    if (c.deleted || likeBusy === c.id) return
     if (!c.liked && !requireAuth('点赞评论')) return
     const prevLiked = c.liked
     const prevLikes = c.likes

@@ -98,15 +98,15 @@ export default function PostContent({ postId, seed, variant, autoFocusInput, onB
     { targetUserId: authorId },
     { retry: 1, enabled: authorId > 0 && !isAuthor },
   )
-  const [following, setFollowing] = useState(false)
-  const [followers, setFollowers] = useState<number | null>(null)
-  useEffect(() => {
-    const data = followStateQuery.data
-    if (data) {
-      setFollowing(data.following)
-      setFollowers(data.followers)
-    }
-  }, [followStateQuery.data])
+  /**
+   * 关注态是**派生值**，不是 query.data 的本地拷贝：本地只保留"乐观期间"的覆盖，
+   * 确认后写回 query 缓存并清空覆盖。
+   * 上一版是 useEffect 把 query.data 拷进 useState —— 正是本轮在 Home.tsx 里拆掉的那个口径：
+   * 拷出去之后缓存改写到达不了 UI，而后台 refetch 又会把用户刚点的乐观值悄悄盖回去。
+   */
+  const [followOverride, setFollowOverride] = useState<{ following: boolean; followers: number } | null>(null)
+  const following = followOverride?.following ?? followStateQuery.data?.following ?? false
+  const followers = followOverride?.followers ?? followStateQuery.data?.followers ?? null
 
   const followMut = trpc.app.posts.toggleFollow.useMutation()
   const deleteMut = trpc.app.posts.delete.useMutation()
@@ -141,10 +141,13 @@ export default function PostContent({ postId, seed, variant, autoFocusInput, onB
   /** 本次手势的起点 x 与「有没有横向滑动过」：见 onImageTap 里的滑动吞点击逻辑 */
   const swipeRef = useRef({ x: 0, moved: false })
   const tracked = useRef(false)
+  /** 删帖成功后延时关闭的计时器句柄：手动关闭或组件卸载时必须取消，否则会二次 onBack */
+  const closeTimer = useRef<number | undefined>(undefined)
 
   useEffect(
     () => () => {
       if (tapTimer.current) window.clearTimeout(tapTimer.current)
+      if (closeTimer.current) window.clearTimeout(closeTimer.current)
     },
     [],
   )
@@ -218,15 +221,23 @@ export default function PostContent({ postId, seed, variant, autoFocusInput, onB
     if (!view || view.authorId == null) return
     if (!requireAuth('关注钓友')) return
     const next = !following
-    setFollowing(next)
-    setFollowers((n) => Math.max(0, (n ?? 0) + (next ? 1 : -1)))
+    // 先落到局部量：null 收窄在 mutation 回调里会失效，直接写 view.authorId 过不了 tsc
+    const targetUserId = view.authorId
+    const nextFollowers = Math.max(0, (followers ?? 0) + (next ? 1 : -1))
+    setFollowOverride({ following: next, followers: nextFollowers })
     followMut.mutate(
       { targetUserId: view.authorId },
       {
-        onSuccess: (r) => setFollowing(r.following ?? next),
+        onSuccess: (r) => {
+          // 服务端确认值写回缓存，覆盖位交还给派生值：单一真源，不留本地态
+          utils.app.posts.followState.setData({ targetUserId }, (o) =>
+            o ? { ...o, following: r.following ?? next, followers: nextFollowers } : o,
+          )
+          setFollowOverride(null)
+        },
         onError: () => {
-          setFollowing(!next)
-          setFollowers((n) => Math.max(0, (n ?? 0) + (next ? -1 : 1)))
+          setFollowOverride(null)
+          void utils.app.posts.followState.invalidate({ targetUserId })
           showToast('操作失败，请稍后再试')
         },
       },
@@ -244,7 +255,7 @@ export default function PostContent({ postId, seed, variant, autoFocusInput, onB
           removeFeedPost(utils, view.id)
           void utils.app.users.overview.invalidate()
           showToast('已删除')
-          window.setTimeout(onBack, 600)
+          closeTimer.current = window.setTimeout(onBack, 600)
         },
         onError: () => showToast('删除失败，请稍后再试'),
       },

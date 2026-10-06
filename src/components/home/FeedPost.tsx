@@ -174,6 +174,12 @@ export default function FeedPost({ post, index, onOpen }: FeedPostProps) {
       tabIndex={postId != null ? 0 : -1}
       onKeyDown={(e) => {
         if (e.key !== 'Enter' && e.key !== ' ') return
+        /**
+         * 键盘事件从焦点元素往上冒泡，所以焦点在卡内按钮上时这里也会触发：
+         * 不判 target 就会「Enter 打开弹层 + preventDefault 取消按钮自身激活」，
+         * 点赞/收藏/分享/更多全部键盘不可用。只有焦点落在卡片本身时才当作整卡激活。
+         */
+        if (e.target !== e.currentTarget) return
         e.preventDefault()
         openPost()
       }}

@@ -328,8 +328,8 @@ reject；`mockFallback` 之所以看起来"永不成立"，真实原因是 react
   「阿里云侧是否判定同一签名」只有配上 AK 才能确认；`bizType` 的确切位置文档示例未覆盖，
   因此默认留空不发送。`IMAGE_MODERATION_ENABLED` 保持 `false`。
 - **⚠️ 这一节让已上传的部署物过期**：`api/` 变了，`/root/dist-v8.12.0.tar.gz`（`ca1c4a00…4532f`）
-  必须替换为新产物 `022115d21cb99b04536f7614b2b978e1aaa85dfd286bed96a658bb759b37e2e4`
-  （本地 `E:\tmp\dist-v8.12.0-r3.tar.gz`），并重出 `SHA_EXPECTED`。
+  必须替换为新产物 `ed190666abae3789422b0f20d1f12ecc6f9f0441aa85409508e9437f80adac65`
+  （本地 `E:\tmp\dist-v8.12.0-r4.tar.gz`），并重出 `SHA_EXPECTED`。
   新产物已复核：180 条目 / **44 个 `.br`** / **0 条反斜杠路径** / **0 处 `data-dbg`**，
   且 bundle 内确认 `2018-05-09`、`HMAC-SHA1`、`/green/image/scan` 就位，
   `images:[…]` base64 通道与 MD5 大写两处缺陷已消失。
@@ -354,6 +354,51 @@ reject；`mockFallback` 之所以看起来"永不成立"，真实原因是 react
   - 顺带修了我自己的探针：`/api/trpc/app.feed` 少带 `batch=1` 会得到 400「expected object,
     received undefined」，那是**我的信封写错了**，不是应用回归。第一次跑我看到 400 时差点把它
     记成机审返工引入的问题——写探针前先确认协议口径（本项目是 superjson + httpBatchLink 信封）。
+
+### 十一、交付前双轴审查（标准轴 + 规格轴）修掉 5 项，并把两条门禁补成可执行
+
+> 这一节的全部结论都在**读源码之后**才落笔：审查子代理给出 4 条「严重」，我逐条打开它引用的行号核实
+> （4/4 命中，但我仍然不打算把它的自述当成证据——上一轮就吃过子代理半成品的亏）。
+
+**修掉的行为缺陷（都有真实用户后果，不是风格问题）**
+1. `FeedPost.tsx` 整卡 `onKeyDown` 不判 `e.target` → 焦点在卡内**任何一个**按钮上按 Enter/Space，
+   都会「打开弹层 + `preventDefault()` 取消按钮自身激活」，等于点赞/收藏/分享/更多全排键盘不可用。
+   现在只在 `e.target === e.currentTarget` 时当作整卡激活。
+2. `CommentSection.tsx` 的在途锁写成 `likeBusy != null` → **一条评论的点赞在飞时，其它评论的点赞被静默吞掉**
+   （按钮看着能点、点了没反应），和同文件 118-119 行「只禁用被点的那一颗」的注释直接矛盾。改成 `likeBusy === c.id`。
+3. `PostContent.tsx` 删帖成功后 `setTimeout(onBack, 600)` 没有句柄也没清理 → 用户在这 600ms 内手动关掉弹层，
+   计时器仍会再 `onBack()` 一次，**多按一次 history.back() 会把 Home 也弹掉**。这与我在 PostSheet 里
+   修过的「双 Escape → 两次 back」是同一个形状，只是这次的诱因是定时器。
+4. `Home.tsx` 下拉刷新的 800ms 收尾计时器同样无主：连拉两次时第一发会把第二发的动画提前收掉，且卸载不清。
+   两处都改为 ref 持有 + 排程前 clear + 卸载清理。
+5. `PostContent.tsx` 的关注态是 `query.data` 拷进 `useState`（`useEffect` 同步）——**正是本轮在 Home.tsx 拆掉、
+   并在 `postCache.ts` 开头点名的那个口径**。改为派生值 + 仅保留乐观覆盖位，成功后把服务端确认写回
+   `followState` 缓存再清空覆盖，失败则清覆盖 + invalidate 让服务端真值回来。
+   顺带暴露一个 TS 细节：`view.authorId` 的 null 收窄在 mutation 回调里会失效，必须先落到局部量。
+
+**我自己审查里发现并修的一条**：`imageStore` 的清理原先只覆盖 reject 分支——`writeImage` 中途抛错
+（磁盘满/IO）时前面几张已经落到公网目录却不会被删，留下「公网可访问、库里永不引用」的孤儿，
+与 reject 分支同一形态、不同诱因。现在写循环也在 try 内，失败即 cleanup 再原样抛出。
+
+**两条门禁从"叙述"变成"可执行"**（规格轴的主要发现）
+- `npm run build` 现在包含 `vitest run`：单测不过就根本不产出可部署物。
+- 新增 `npm run verify:static` —— **此前首屏体积/按需 chunk/ETag 的唯一执行处 `smoke-static.mjs`
+  在 package.json 里没有任何入口**，只活在 CHANGELOG 的文字里；也就是说这些 ✅ 的验收项无法被复跑，
+  一旦回退没有任何信号。本轮补上入口并**实跑一次：全部通过**（CSS 6.4KB / 主 JS 51.9KB / 字体 34.4KB，
+  按需 chunk 1.3–1.4KB，ETag/304、埋点白名单与隔离目录九项全绿）。
+- 记一条余量告警：`PostContent` 分块 **11.96 KB br**，顶在 12KB 线上（零余量）。它现在能过是因为
+  门禁只约束被点名的按需 chunk；但只要再往里加一点东西就会变成真违规。要么拆，要么在下一轮明确提线。
+
+**审查里我判定"暂不动"的（如实列出，不当已解决）**：`CommentSection` 顶层楼与楼内回复两份逐行重复的行卡 JSX
+（+800 行里最大的结构泥团）；`Favorites` 两份骨架与 Tab 条魔法数 `calc(1.5rem + 1.5rem)` 复制自 Home；
+`CatchViewer` 的 `Send` 图标是看着能点的死按钮；`ReportSheet` 关闭不清 `reason/note`（第二次举报带上次的补充说明）；
+`check-motion-boundary.mjs` 的 `depsOf` 只解析 `@/` 不解析相对路径（本轮实测没有任何相对路径引入 domMax 组件，
+门禁 4/4 仍成立，但盲区是真的）；react-query 缓存 key 不含用户 id 且登出不清缓存 → **换账号可能脏读自己的
+liked/collected**，这属产品口径判断，我没有擅自改。
+
+**产物随之重出**：`ed190666abae3789422b0f20d1f12ecc6f9f0441aa85409508e9437f80adac65`
+（`E:	mp\dist-v8.12.0-r4.tar.gz`，180 条目 / 44 个 `.br` / 0 反斜杠 / 0 测试文件），
+因为本轮动了 `src/` 与 `package.json` —— 按我自己定下的判据（diff 非空才重发），这次就该重发。
 
 ## [v8.11.0] - 2026-10-04 「哪钓专业化」（迭代计划 v13，C1~C7 全量）
 

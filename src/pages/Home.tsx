@@ -136,6 +136,9 @@ function FeedSkeleton() {
 
 /** 首页 · 社区信息流：TopBar + Story 圈 + 渔获大图信息流（整卡点开弹层/无限滚动/下拉刷新）
  *  数据源：trpc.app.feed 推荐算法分页；接口异常时保留已加载真实帖在前、本地 mock 仅作补充填充 */
+const PAGE_SIZE = 5
+const SEARCH_PAGE_SIZE = 10
+
 export default function Home() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -263,7 +266,6 @@ export default function Home() {
    * 现在没有拷贝了，patch 缓存 = 改 UI；同时也不碰 useEffect 里 setState
    * （react-hooks/set-state-in-effect 是本项目 lint 红线）。
    */
-  const PAGE_SIZE = 5
   const [loadedPages, setLoadedPages] = useState<number[]>([1])
   // tRPC v11 的 useQueries 只有根级形式（procedure 上没有 .useQueries），
   // 回调里给每条 query 传 input + 该条自己的 options。
@@ -281,11 +283,18 @@ export default function Home() {
   const feedFetching = feedQueries.some((q) => q.isFetching)
   const liveLoading = !mockFallback && livePosts.length === 0 && feedQueries.some((q) => q.isPending)
   const [mockPosts, setMockPosts] = useState<FeedPostData[]>(FEED_POSTS)
+  /** 下拉刷新收尾计时器：连拉两次时，第一发的计时器会把第二发的动画提前收掉，卸载也必须清 */
+  const refreshTimer = useRef<number | undefined>(undefined)
+  useEffect(
+    () => () => {
+      if (refreshTimer.current) window.clearTimeout(refreshTimer.current)
+    },
+    [],
+  )
 
   // ---- 帖子搜索（QY-COMM-007）：顶栏放大镜展开输入框；清空关键词回到正常 feed ----
   // 与推荐流同一套路：已加载页码记在 state，卡片渲染时从 useQueries 的结果现取，
   // 于是 patchSearchPost 写进缓存的点赞/收藏态会当场反映到搜索卡上。
-  const SEARCH_PAGE_SIZE = 10
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [keyword, setKeyword] = useState('')
@@ -445,7 +454,8 @@ export default function Home() {
       setExtraPosts([])
       setRound(0)
       setMockPosts(shuffle(FEED_POSTS))
-      window.setTimeout(() => {
+      if (refreshTimer.current) window.clearTimeout(refreshTimer.current)
+      refreshTimer.current = window.setTimeout(() => {
         setRefreshing(false)
         setPull(0)
         // 刷新语义要两步一起做：
