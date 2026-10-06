@@ -20,7 +20,13 @@ import path from 'node:path'
 const root = path.resolve(import.meta.dirname, '..')
 const planPath = path.resolve(root, '../docs/产品/迭代计划-v14-草案.md')
 const CODE_DIRS = ['src', 'api', 'db', 'contracts', 'scripts']
-const DOC_FILES = ['CHANGELOG.md', 'docs/agile/product-backlog.md', '../docs/NEXT-ITERATION.md', '../CONTEXT.md']
+/**
+ * 「叙述证据」只认 CHANGELOG：那里写的是实测过程（浏览器探针、真库冒烟、单测结果）。
+ * 曾把 backlog / NEXT-ITERATION / CONTEXT 也算作证据源，结果只是「在文档里抄了一份 ID 清单」
+ * 就能把零证据数刷成 0——本文件自己就中过一次这个招（写续接说明时粘了 21 个号，指标立刻变好看）。
+ * 指标必须只能被「真的留下证据」改善，不能被「提到这件事」改善。
+ */
+const DOC_FILES = ['CHANGELOG.md']
 
 const plan = fs.readFileSync(planPath, 'utf8')
 const ids = [...new Set(plan.match(/QY-[A-Z]+-\d+/g) ?? [])].sort()
