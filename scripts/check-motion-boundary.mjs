@@ -140,13 +140,16 @@ function depsOf(file, seen = new Set()) {
   let m
   while ((m = re.exec(src))) {
     const spec = m[1]
-    if (spec.startsWith('@/')) {
-      const base = path.join(srcRoot, spec.slice(2))
-      for (const cand of [base + '.tsx', base + '.ts', path.join(base, 'index.tsx'), path.join(base, 'index.ts')]) {
-        if (fs.existsSync(cand)) {
-          depsOf(cand, seen)
-          break
-        }
+    // 别名与相对路径都要跟：只跟 `@/` 会让「页面用 ./X 引进一个 drag 组件」这种
+    // 组合完全看不见，不变量 2 就形同虚设（本项目 90% 用 @/，但比例不是保证）。
+    let base = null
+    if (spec.startsWith('@/')) base = path.join(srcRoot, spec.slice(2))
+    else if (spec.startsWith('./') || spec.startsWith('../')) base = path.resolve(path.dirname(file), spec)
+    if (!base) continue // 裸包名（react / framer-motion …）不在项目图里
+    for (const cand of [base + '.tsx', base + '.ts', path.join(base, 'index.tsx'), path.join(base, 'index.ts')]) {
+      if (fs.existsSync(cand)) {
+        depsOf(cand, seen)
+        break
       }
     }
   }
