@@ -308,12 +308,28 @@ reject；`mockFallback` 之所以看起来"永不成立"，真实原因是 react
     都在**加载时**定死，我改了 `process.env` 却仍在用同一个已缓存的模块实例。
     加 `vi.resetModules()` 后 13/13 通过。**"测试失败"先怀疑测试自己的取样方式**，
     这和 B-24 是同一种错。
+- **新增 `scripts/smoke-images.ts`（`npm run verify:images`）：连真实库跑通带图发布链路，可重复、自清理**。
+  锁的是 createPost/addComment 的**接线**（单测只锁到 ingestImages）：库里只存 `/uploads` URL 且无
+  base64 长串、文件真在磁盘、URL 与文件一一对应、评论头像取自 `users.avatar` 而非占位值、
+  机审未配置时真的写了 `[系统]…待人工复核：2 张，原因：机审未启用（IMAGE_MODERATION_ENABLED!=true）`。
+  连跑 3 次均 PASSED，`uploads/{posts,comments}` 残留 0、帖子/评论行残留 0
+  （库里那 1 条 `[系统]` 行是更早一轮手工测试留下的，属既有数据，非本脚本泄漏——按 postId 精确清理）。
+  - 为什么没并进 `scripts/smoke.ts`：先试过作为它的第 8 节。但 `smoke.ts` 第 2 节要先下单，
+    在"按座位售票"的库（生产形状的数据）上会以「钓位数量必须与购票数量一致」失败退出，
+    **后面的节永远跑不到**。未跑到的测试比没有测试更糟——它会让下一个人以为这条口径已被覆盖。
+    这是 `smoke.ts` 的一个既有局限（与本轮改动无关），已在此登记，下一轮应把下单节改为
+    先探测该帖是否要求座位、不满足就跳过，而不是让它把整条套件带崩。
+  - 我自己的两个假阴性（都不是应用的错）：① drizzle 的 `select()` await 后**直接是行数组**，
+    我还按 mysql2 的习惯解构 `[rows]`，于是拿到的是"第一行对象"，再取 `[0]` 成 undefined，
+    报出"库里没有用户行"；② 探针最初放在项目外（`E:\tmp`），那里没有 `package.json`，
+    tsx 按 CJS 转换 → 顶层 await 直接编译失败；且 `mysql2` 也解析不到（node_modules 在项目里）。
+    **一次性验证脚本应放在项目内**，别把环境差异误读成被测代码的问题。
 - **仍未做完的（不是我能在本机做的）**：真实网关联调。签名规则已按文档对齐，但
   「阿里云侧是否判定同一签名」只有配上 AK 才能确认；`bizType` 的确切位置文档示例未覆盖，
   因此默认留空不发送。`IMAGE_MODERATION_ENABLED` 保持 `false`。
 - **⚠️ 这一节让已上传的部署物过期**：`api/` 变了，`/root/dist-v8.12.0.tar.gz`（`ca1c4a00…4532f`）
-  必须替换为新产物 `84b89397439a4ceac58f91c0f9cae7c5c1a41f2ddc2c2addbcb4ca9b0cd6cc5b`
-  （本地 `E:\tmp\dist-v8.12.0-r2.tar.gz`），并重出 `SHA_EXPECTED`。
+  必须替换为新产物 `022115d21cb99b04536f7614b2b978e1aaa85dfd286bed96a658bb759b37e2e4`
+  （本地 `E:\tmp\dist-v8.12.0-r3.tar.gz`），并重出 `SHA_EXPECTED`。
   新产物已复核：180 条目 / **44 个 `.br`** / **0 条反斜杠路径** / **0 处 `data-dbg`**，
   且 bundle 内确认 `2018-05-09`、`HMAC-SHA1`、`/green/image/scan` 就位，
   `images:[…]` base64 通道与 MD5 大写两处缺陷已消失。

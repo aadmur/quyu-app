@@ -12,6 +12,7 @@
     "check": "tsc -b",
     "check:knowledge": "node --import tsx scripts/check-knowledge.ts",
     "verify:fishspot": "node --env-file=.env.smoke --import tsx scripts/verify-fishspot.ts",
+    "verify:images": "node --env-file=.env.smoke --import tsx scripts/smoke-images.ts",
     "format": "prettier --write .",
     "test": "vitest run",
     "perf:firstload": "node scripts/measure-firstload.mjs",

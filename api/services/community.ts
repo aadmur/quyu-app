@@ -673,7 +673,7 @@ export async function addComment(input: AddCommentInput): Promise<CommentNode> {
     effectiveParentId = parent.parentId != null ? Number(parent.parentId) : Number(parent.id);
     replyToUserId = parent.userId != null ? Number(parent.userId) : null;
   }
-  // 图片：机审（落盘前）→ 写 uploads/comments → 只把 URL 数组落库
+  // 图片：写 uploads/comments → 按 /uploads 公网 URL 机审 → 只把 URL 数组落库（顺序由接口约束决定）
   const ingested: IngestedImages = await ingestImages(input.images, {
     slot: "comments",
     userId,
@@ -784,7 +784,7 @@ export async function createPost(
   // 内容前置过滤（QY-SAFE-002）：正文 + 鱼种标签合并检查；
   // 违禁词 reject 直接抛错不落库；广告词 flag 照常发帖、事后写系统举报进审核队列
   const filter = assertContentAllowed(`${input.content} ${input.fishSpecies ?? ""}`, "post", user.id);
-  // 图片链路（ADR-0003）：解码校验 → 机审（落盘前，图片无需公网可访问）→ 写 uploads/posts →
+  // 图片链路（ADR-0003）：解码校验 → 写 uploads/posts → 按 /uploads 公网 URL 机审 →
   // 只有 URL 数组进数据库。放在 pondId 反查之前，是为了让「超限/违规」这种必然失败的请求
   // 尽早返回；文本过滤在最前，是为了不为一篇注定被拦下的帖子烧机审额度、留孤儿文件。
   const ingested: IngestedImages = await ingestImages(input.images, { slot: "posts", userId: user.id, kind: "post" });
@@ -873,7 +873,7 @@ export async function editPost(userId: number, postId: number, input: EditPostIn
     input.content !== undefined || input.fishSpecies !== undefined
       ? assertContentAllowed(`${input.content ?? ""} ${input.fishSpecies ?? ""}`, "post", userId)
       : null;
-  // 图片变更走与 createPost 完全相同的链路（机审 → 落盘 → 存 URL），
+  // 图片变更走与 createPost 完全相同的链路（落盘 → 机审 → 存 URL），
   // 否则「先发帖、再编辑塞 base64」就是绕过 ADR-0003 的后门。
   // 换图后不回收旧文件：与 imageStore 的孤儿文件口径一致（低频、单实例磁盘余量足够），
   // 在写路径上 rm 只会新增失败模式，治理应交给离线对账。
