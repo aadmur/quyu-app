@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { trpc } from '@/providers/trpc'
+import { resetViewerCache } from '@/lib/postCache'
 
 interface PasswordAuthFormProps {
   /** 登录/注册成功后的回调（关闭弹层或跳转） */
@@ -14,8 +16,11 @@ export default function PasswordAuthForm({ onSuccess, compact = false }: Passwor
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const utils = trpc.useUtils()
+  const queryClient = useQueryClient()
 
   const onMutSuccess = () => {
+    // 上一个账号（或匿名态）的 viewer 级缓存不能带进新会话：见 postCache.resetViewerCache
+    resetViewerCache(queryClient)
     void utils.auth.me.invalidate()
     onSuccess?.()
   }

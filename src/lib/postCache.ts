@@ -105,6 +105,21 @@ export function patchPostDetail(utils: Utils, postId: number, mutate: (p: PostDe
 }
 
 /**
+ * 会话切换（登录成功 / 退出登录）时整份清空查询缓存。
+ *
+ * 为什么不是逐个 invalidate：本项目的缓存键只有入参（`app.feed` 的 `{page,pageSize}` 等），
+ * **不含用户 id**，而出参里带着 viewer 级字段——`liked`/`collected`、收藏列表、评论点赞态、
+ * 我的订单。登录与退出都在 SPA 内完成（`PasswordAuthForm` 与 `Profile` 原先只 invalidate `auth.me`，
+ * 页面不重载），于是换账号后**上一个账号的这些状态会继续显示**，直到 staleTime(30s)/gcTime(5min)
+ * 各自过期为止：用户在"我的收藏"里看到的是别人点过的帖子。
+ * 逐条列清单去 invalidate 迟早漏一个 procedure；而"会话变了 ⇒ 所有 viewer 级数据作废"这条不变量，
+ * 只有整体清空才守得住。代价是切换后当前页会短暂回到骨架屏，这是正确行为——旧数据本就属于别人。
+ */
+export function resetViewerCache(queryClient: QueryClient) {
+  queryClient.clear()
+}
+
+/**
  * 从所有已缓存分页里剔除一条帖子（删帖后用）。
  * 迭代前删帖甩的是 feed.invalidate()：为了消失一张卡，把用户刷过的每一页
  * 全部重请求一遍。这里直接在缓存里把它摘掉，零网络往返。

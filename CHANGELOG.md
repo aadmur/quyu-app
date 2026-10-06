@@ -328,8 +328,8 @@ reject；`mockFallback` 之所以看起来"永不成立"，真实原因是 react
   「阿里云侧是否判定同一签名」只有配上 AK 才能确认；`bizType` 的确切位置文档示例未覆盖，
   因此默认留空不发送。`IMAGE_MODERATION_ENABLED` 保持 `false`。
 - **⚠️ 这一节让已上传的部署物过期**：`api/` 变了，`/root/dist-v8.12.0.tar.gz`（`ca1c4a00…4532f`）
-  必须替换为新产物 `ed190666abae3789422b0f20d1f12ecc6f9f0441aa85409508e9437f80adac65`
-  （本地 `E:\tmp\dist-v8.12.0-r4.tar.gz`），并重出 `SHA_EXPECTED`。
+  必须替换为新产物 `eb4303545b5a6f884265a193ec6f51a55a3443b5b5cc566508f32d6a14244e60`
+  （本地 `E:\tmp\dist-v8.12.0-r5.tar.gz`），并重出 `SHA_EXPECTED`。
   新产物已复核：180 条目 / **44 个 `.br`** / **0 条反斜杠路径** / **0 处 `data-dbg`**，
   且 bundle 内确认 `2018-05-09`、`HMAC-SHA1`、`/green/image/scan` 就位，
   `images:[…]` base64 通道与 MD5 大写两处缺陷已消失。
@@ -355,7 +355,7 @@ reject；`mockFallback` 之所以看起来"永不成立"，真实原因是 react
     received undefined」，那是**我的信封写错了**，不是应用回归。第一次跑我看到 400 时差点把它
     记成机审返工引入的问题——写探针前先确认协议口径（本项目是 superjson + httpBatchLink 信封）。
 
-### 十一、交付前双轴审查（标准轴 + 规格轴）修掉 5 项，并把两条门禁补成可执行
+### 十一、交付前双轴审查（标准轴 + 规格轴）修掉 7 项，并把两条门禁补成可执行
 
 > 这一节的全部结论都在**读源码之后**才落笔：审查子代理给出 4 条「严重」，我逐条打开它引用的行号核实
 > （4/4 命中，但我仍然不打算把它的自述当成证据——上一轮就吃过子代理半成品的亏）。
@@ -396,9 +396,34 @@ reject；`mockFallback` 之所以看起来"永不成立"，真实原因是 react
 门禁 4/4 仍成立，但盲区是真的）；react-query 缓存 key 不含用户 id 且登出不清缓存 → **换账号可能脏读自己的
 liked/collected**，这属产品口径判断，我没有擅自改。
 
-**产物随之重出**：`ed190666abae3789422b0f20d1f12ecc6f9f0441aa85409508e9437f80adac65`
-（`E:	mp\dist-v8.12.0-r4.tar.gz`，180 条目 / 44 个 `.br` / 0 反斜杠 / 0 测试文件），
+**产物随之重出**：`eb4303545b5a6f884265a193ec6f51a55a3443b5b5cc566508f32d6a14244e60`
+（`E:	mp\dist-v8.12.0-r5.tar.gz`，180 条目 / 44 个 `.br` / 0 反斜杠 / 0 测试文件），
 因为本轮动了 `src/` 与 `package.json` —— 按我自己定下的判据（diff 非空才重发），这次就该重发。
+
+
+**审查之后又补的两件事（同样是审出来的，不是猜出来的）**
+- **会话切换必须整份清空查询缓存**（新增 `resetViewerCache`，接在 `PasswordAuthForm` 登录成功与
+  `Profile` 退出登录两处）。这不是产品口径而是正确性缺陷：缓存键只有入参、**不含用户 id**，
+  而出参带着 viewer 级的 `liked/collected`、收藏列表、评论点赞态、我的订单；登录与登出都发生在
+  SPA 内（原先只 `invalidate` 了 `auth.me` / `users.overview`，页面不重载），于是**换账号后上一个账号的
+  点赞收藏态会继续显示给下一个账号**，直到各自 staleTime/gcTime 过期。逐条列清单去 invalidate 迟早漏一个，
+  所以按「会话变了 ⇒ 所有 viewer 级数据作废」这条不变量整体清空。代价是切换后当前页短暂回骨架屏——
+  旧数据本就属于别人，这是正确表现。
+  - 第一版写成 `utils.queryClient.clear()`，tsc 直接拒了：tRPC v11 的 utils 类型上没有 `queryClient`。
+    改用标准的 `useQueryClient()`，而不是为了拿句柄去导出模块级单例（那会踩 react-refresh 的混合导出规则）。
+- **`package.json` 里有一对重复键 `verify:images`，而我此前的校验看不见它。** 是 esbuild 在 vitest 启动时
+  报 duplicate-object-key 才暴露的：`JSON.parse` 对重复键不报错，后值静默覆盖前值，所以我那句
+  「JSON OK」对这个失败模式**根本不可能失败**——校验必须能对被防的那类错误报警，否则等于没有校验。
+  现在改用 `object_pairs_hook` 检查键唯一性。教训与 B-24、CRLF 那两次同源：**先怀疑探针，再下结论**。
+- 测试基线扩到 **23 条**：`vitest.config.ts` 的 include 加上 `src/lib/**/*.test.ts`（缓存层是纯逻辑，
+  node 环境就能测，不必先引 jsdom）。新增的 `postCache.test.ts` 第一版也写错了 API——
+  `getQueryCache()` 返回 QueryCache 对象而非数组，`toHaveLength` 无从落下，改为 `.getAll()`。
+  这 2 条是真跑过才留下的：清空后两条 viewer 级缓存都取不到、缓存表为空、空缓存上不抛错。
+
+**重出产物**：`eb4303545b5a6f884265a193ec6f51a55a3443b5b5cc566508f32d6a14244e60`
+（`E:	mp\dist-v8.12.0-r5.tar.gz`，180 条目 / 44 个 `.br` / 0 反斜杠 / 0 测试文件；
+构建链现在自带 `vitest run`，23/23 通过才产出 dist）。首屏口径复核：eager JS 148.7 KB br、
+CSS 6.44 KB br、按需 `PostContent` 11.96 KB br（仍顶在 12KB 线上、零余量，已登记）。
 
 ## [v8.11.0] - 2026-10-04 「哪钓专业化」（迭代计划 v13，C1~C7 全量）
 

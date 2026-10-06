@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { m, animate, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -30,6 +31,7 @@ import ProfileInsightSheet from '@/components/community/ProfileInsightSheet'
 import { PROFILE } from '@/data/community'
 import type { CatchItem } from '@/data/community'
 import { trpc } from '@/providers/trpc'
+import { resetViewerCache } from '@/lib/postCache'
 import LoginSheet from '@/components/LoginSheet'
 import ProductOrdersSheet from '@/components/shop/ProductOrdersSheet'
 
@@ -91,6 +93,7 @@ export default function Profile() {
 
   // 真实登录状态：auth.me 返回当前用户或 null（loading 中先显示骨架，避免闪烁）
   const utils = trpc.useUtils()
+  const queryClient = useQueryClient()
   const meQuery = trpc.auth.me.useQuery(undefined, { staleTime: 60_000, retry: false })
   const meLoading = meQuery.isLoading
   const me = meQuery.data ?? null
@@ -130,8 +133,10 @@ export default function Profile() {
   const logoutMut = trpc.auth.logout.useMutation({
     onSuccess: async () => {
       setProfile(null)
+      // 整份清空而不是挑两个 procedure invalidate：缓存键里没有用户 id，
+      // 漏掉的那一个就会把上一个账号的数据显示给下一个（见 postCache.resetViewerCache）
+      resetViewerCache(queryClient)
       await utils.auth.me.invalidate()
-      await utils.app.users.overview.invalidate()
       showToast('已退出登录')
     },
   })
