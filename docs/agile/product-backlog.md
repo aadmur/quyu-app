@@ -7,7 +7,7 @@
 | ID | 用户故事 | 优先级 | 验收标准 |
 |---|---|---|---|
 | B-14 | 作为开发，我希望把历史帖的 base64 图片一次性回填为磁盘 URL，彻底解除单行 MB 级与内存压力 | Must | 先跑迁移面预检 `SELECT COUNT(*) FROM posts WHERE JSON_SEARCH(images,'one','data:image%') IS NOT NULL` 确认行数；脚本幂等可重跑；回填前 mysqldump + 原值导出 JSON 备份；回滚可用备份写回（ADR-0002）。**注意 `postCoverSql` 对 >512 字符首图判 null，未回填的遗留图帖在 feed 里没有封面——回填完才恢复** |
-| B-15 | 作为运营，我希望 UGC 图片机审真正生效，而不是停在「放行转人工」降级 | Must | 开通阿里云内容安全并配 AK/Secret；**校正 `imageModeration.ts` 的 ROA 签名与请求体字段**（当前 `TODO(签名校正)`，未联调，`IMAGE_MODERATION_ENABLED` 默认 false）；用已知违规样本站实测命中并拒收；敲定「机审不可达时 fail-closed 还是 fail-open」这一产品决策 |
+| B-15 | 作为运营，我希望 UGC 图片机审真正生效，而不是停在「放行转人工」降级 | Must | **2026-10-06 进度**：请求侧已按官方文档返工并由 `api/services/imageModeration.test.ts`（13 条，mock fetch）锁住形状——base64 通道不存在（两版接口都只要图片 URL）、四个 `x-acs-*` 必发头、Content-MD5 不得大写、违规则删刚落盘文件并拒收。**剩下的全是线上动作**：开通内容安全 + RAM 子账号 AK/Secret、配 `PUBLIC_MEDIA_BASE_URL`（必须是阿里云侧真能访问到的公网前缀）、置 `IMAGE_MODERATION_ENABLED=true`，再拿一张正常图 + 一张违规图各发一次，确认第二张真回到 `reject` 且文件被删。顺带确认 `bizType` 在请求体里的确切位置（文档示例未覆盖，当前留空不发送）。最后敲定「机审不可达时 fail-closed 还是 fail-open」这一产品决策——当前默认沿用「放行 + 转人工队列」 |
 | B-16 | 作为开发，我希望 uploads 目录在任何部署形态下都不丢 | Must | 当前 systemd + tar 解包是安全的（热更只 `rm -rf dist`）；**若切容器化必须给 `/app/uploads` 挂 volume**，否则每次重建镜像历史图片全 404（v8.10.1 有图片 404 前科）；补落盘孤儿文件清理任务 |
 | B-01 | 作为塘主，我希望核销码更难被暴力破解，以保护我的收入 | Must | 核销码升级为 10 位字母数字混合；6 位旧码兼容期内仍可核销；爆破限流 5 次/min 生效 |
 | B-02 | 作为钓友，我希望同一钓位可按日期预订，避免一次购买永久占座 | Must | seats 增加 visit_date 维度；同座位不同日期可分别售出；下单时校验当日库存 |
