@@ -35,6 +35,13 @@ CREATE TABLE IF NOT EXISTS `user_balance` (
 	CONSTRAINT `user_balance_id` PRIMARY KEY(`id`),
 	CONSTRAINT `user_balance_user_id_unique` UNIQUE(`user_id`)
 );
-CREATE INDEX `idx_fishspot_user_created` ON `fish_spot_calls` (`user_id`,`created_at`);
-CREATE INDEX `idx_recharge_user` ON `recharge_orders` (`user_id`,`created_at`);
-CREATE INDEX `idx_user_balance_user` ON `user_balance` (`user_id`);
+-- v14 补守卫：原三行裸 CREATE INDEX 让本文件**不可重跑**（第二次报 Duplicate key name），
+-- 与文件头声明的"幂等，可重复执行"矛盾。平时没人碰它所以没暴露，直到 v14 迁移验证脚本
+-- 按"生产真实路径"重放 0011→0014 时才炸出来。恢复演练若依赖本文件会在第 38 行中断。
+-- 现在统一改用与 0012/0013/0014 相同的 information_schema + PREPARE 惯用法。
+SET @s = (SELECT IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'fish_spot_calls' AND INDEX_NAME = 'idx_fishspot_user_created'), 'SELECT ''skip: idx_fishspot_user_created''', 'CREATE INDEX `idx_fishspot_user_created` ON `fish_spot_calls` (`user_id`,`created_at`)'));
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @s = (SELECT IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'recharge_orders' AND INDEX_NAME = 'idx_recharge_user'), 'SELECT ''skip: idx_recharge_user''', 'CREATE INDEX `idx_recharge_user` ON `recharge_orders` (`user_id`,`created_at`)'));
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @s = (SELECT IF(EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user_balance' AND INDEX_NAME = 'idx_user_balance_user'), 'SELECT ''skip: idx_user_balance_user''', 'CREATE INDEX `idx_user_balance_user` ON `user_balance` (`user_id`)'));
+PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;

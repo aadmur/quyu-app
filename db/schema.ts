@@ -174,11 +174,49 @@ export const comments = mysqlTable("comments", {
   postId: bigint("post_id", { mode: "number", unsigned: true }).notNull(),
   userId: bigint("user_id", { mode: "number", unsigned: true }),
   authorName: varchar("author_name", { length: 64 }).notNull(),
+  // v14：对齐 posts/reviews 的冗余模式，消除前端 (userId+id)%7 假头像
+  authorAvatar: varchar("author_avatar", { length: 255 }).notNull().default("/avatar-1.png"),
   content: varchar("content", { length: 500 }).notNull(),
+  // 评论图片（v14）：落盘 URL 数组，发布前过机审（ADR-0003）
+  images: json("images").$type<string[]>().notNull(),
   // 楼中楼（QY-COMM-006）：NULL=顶层评论；回复时指向所属顶层评论（最多两层）
   parentId: bigint("parent_id", { mode: "number", unsigned: true }),
+  likeCount: int("like_count").notNull().default(0),
+  // 软删（v14，与 posts.deletedAt 同语义）：删除后置为时间，渲染「该评论已删除」占位，
+  // 关键是保留楼中楼结构不塌陷（硬删顶层会让子回复孤儿化）
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => [index("idx_comments_post_created").on(t.postId, t.createdAt)]);
+}, (t) => [
+  index("idx_comments_post_created").on(t.postId, t.createdAt),
+  // 热门排序分页（v14）：与最新排序各走一套游标，互不共用
+  index("idx_comments_post_like").on(t.postId, t.likeCount, t.createdAt),
+  // 楼中楼取子回复（v14）
+  index("idx_comments_parent").on(t.parentId, t.createdAt),
+]);
+
+// ============ 评论点赞（v14，ADR-0004：不复用 likes 表） ============
+// likes 是 post 专用且 backlog B-06 记有其 INSERT 与 likeCount 累加非同事务的隐患，
+// 不在未修复前往上叠加改造。代价是系统里存在两张点赞表。
+export const commentLikes = mysqlTable("comment_likes", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  commentId: bigint("comment_id", { mode: "number", unsigned: true }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("uq_comment_like").on(t.userId, t.commentId),
+  index("idx_comment_like_comment").on(t.commentId),
+]);
+
+// ============ 帖子收藏（v14，归集到 /favorites 的「帖子」Tab） ============
+export const postFavorites = mysqlTable("post_favorites", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  postId: bigint("post_id", { mode: "number", unsigned: true }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("uq_post_favorite").on(t.userId, t.postId),
+  index("idx_favorite_user_created").on(t.userId, t.createdAt),
+]);
 
 // ============ 评价（订单核销后） ============
 export const reviews = mysqlTable("reviews", {
@@ -309,13 +347,17 @@ export const reports = mysqlTable("reports", {
   id: serial("id").primaryKey(),
   reporterId: bigint("reporter_id", { mode: "number", unsigned: true }).notNull(), // 举报人
   postId: bigint("post_id", { mode: "number", unsigned: true }).notNull(),         // 被举报帖子
+  // 评论级举报（v14）：**0 = 举报整帖**，非 0 = 举报该帖下的某条评论。
+  // 刻意用 NOT NULL DEFAULT 0 而不是 nullable：MySQL 唯一索引里 NULL <> NULL，
+  // 若做成 NULL 列并入 uq_report，同一人对同帖的重复举报将不再被去重（幂等性失效）。
+  commentId: bigint("comment_id", { mode: "number", unsigned: true }).notNull().default(0),
   reason: varchar("reason", { length: 255 }).notNull(),
   status: varchar("status", { length: 16 }).notNull().default("pending"), // pending/ignored/actioned
   handledBy: bigint("handled_by", { mode: "number", unsigned: true }),
   handledAt: timestamp("handled_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [
-  uniqueIndex("uq_report").on(t.reporterId, t.postId), // 同一人对同帖重复举报幂等
+  uniqueIndex("uq_report").on(t.reporterId, t.postId, t.commentId), // 同一人对同一目标重复举报幂等
   index("idx_reports_status").on(t.status),
 ]);
 
