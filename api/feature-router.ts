@@ -3,13 +3,35 @@
  * @file api/feature-router.ts
  *
  * 业务逻辑已下沉到 api/services/*（Community/PondCatalog/Order/Shop/Recommend/OwnerDashboard）。
- * 对外契约（路径/入参/出参）与改造前完全一致，前端零改动。
  * 横切：traced（结构化日志）+ rateLimit（TokenBucket，见 api/middleware.ts）。
+ *
+ * v14「帖子交互优化」对外契约（与前端并行编码对齐，字段名不要改）：
+ * posts.comments / commentReplies / toggleCommentLike / deleteComment / comment /
+ * toggleFavorite / myFavorites / detail(create/edit 的图片语义同步变更)。
+ * 分页游标一律是 { createdAt: ISO 字符串, id: number }——刻意不用 Date，
+ * 避免 superjson 的 Date 序列化在两端口径上漂移（service 层 parseCursor 负责解析与容错）。
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { createRouter, rateLimit, tracedPublic } from "./middleware";
-import { toggleLike, addComment, listComments, listNews, createPost, getPost, deletePost, editPost, searchPosts, getShareCard } from "./services/community";
+import { createRouter, rateLimit, tracedPublic, consumeTokenBucket } from "./middleware";
+import {
+  toggleLike,
+  addComment,
+  listComments,
+  listCommentReplies,
+  toggleCommentLike,
+  deleteComment,
+  listNews,
+  createPost,
+  getPostDetail,
+  deletePost,
+  editPost,
+  searchPosts,
+  getShareCard,
+  togglePostFavorite,
+  myPostFavorites,
+} from "./services/community";
+import { IMAGE_SLOT_LIMITS } from "./services/imageStore";
 import { toggleFollow, followState, followStats, followersList, followingList } from "./services/social";
 import { reportPost, listReports, handleReport } from "./services/moderation";
 import { submitApplication, myApplication, listPendingApplications, reviewApplication, pendingApplicationCount } from "./services/pondApplication";
@@ -44,10 +66,30 @@ function actorKey(ctx: { user?: { id: number } | null; ip?: string }) {
   return `ip:${ctx.ip ?? "unknown"}`;
 }
 
+/**
+ * 互动态读取用的 viewerId（v14 新增，只认真实登录态）。
+ * 刻意不走 uid() 的 DEMO_USER 兜底：liked/collected 回答的是「**你**点过/收过没有」，
+ * 匿名访客按 userId=1 去查，会把演示账号的点赞与收藏渲染成自己的（取消点赞还会写进 1 号账号）。
+ * 这与 feed 早先按 uid() 记曝光不同——那种「归错给人」用户看不见，而这种看得见。
+ * userId=0 在 users/likes/post_favorites/comment_likes 里不存在（serial 从 1 起），天然得到全 false。
+ */
+function viewerId(ctx: { user?: { id: number } | null }): number {
+  return ctx.user?.id ?? 0;
+}
+
 /** IP 维度限流 key（核销码防爆破的双维度之一，匿名/登录都按真实连接 IP 计） */
 function ipKey(ctx: { ip?: string }) {
   return `ip:${ctx.ip ?? "unknown"}`;
 }
+
+/**
+ * 游标分页入参（v14 统一形状）。
+ * createdAt 用 ISO 字符串而不是 Date：service 层 parseCursor 解析、非法即当首页，
+ * 这样既躲开 superjson 对 Date 的序列化差异，也不给伪造游标留出报错面。
+ * id 是「该页排序所依据的行 id」——评论列表是 comments.id，收藏列表是 post_favorites.id。
+ */
+const cursorSchema = z.object({ createdAt: z.string(), id: z.number().int() }).nullable().optional();
+const limitSchema = (max: number) => z.number().int().min(1).max(max).optional();
 
 /** 塘主门禁（v8.6.0 多钓场绑定）：全局 admin 或 pond_admins 有任何绑定的塘主。
  *  返回规范化 OwnerUser 供下游作用域过滤；不满足抛 403。 */
@@ -64,7 +106,8 @@ export const featureRouter = createRouter({
   feed: tracedPublic
     .input(z.object({ page: z.number().min(1).default(1), pageSize: z.number().min(1).max(20).default(5) }))
     .query(async ({ ctx, input }) => {
-      return recommendFeed(uid(ctx), input.page, input.pageSize);
+      // 个性化按 uid(ctx)（匿名走演示账号，与改造前一致）；liked/collected 按 viewerId(ctx)（匿名恒 false）
+      return recommendFeed(uid(ctx), input.page, input.pageSize, viewerId(ctx));
     }),
 
   // 行为埋点：曝光/点击/完播/点赞入队即返回，异步批量落库
@@ -177,12 +220,75 @@ export const featureRouter = createRouter({
       }),
     comment: tracedPublic
       .use(rateLimit({ capacity: 10, refillPerSec: 0.2, key: actorKey, message: "评论太频繁了，休息一下" }))
-      .input(z.object({ postId: z.number(), content: z.string().min(1).max(500), authorName: z.string().default("钓友"), parentId: z.number().optional() }))
+      .input(
+        z.object({
+          postId: z.number(),
+          content: z.string().min(1).max(500),
+          authorName: z.string().default("钓友"),
+          parentId: z.number().optional(),
+          // 评论配图（v14）：dataURL 数组，服务端机审 + 落盘后只存 URL；
+          // 张数上限与 imageStore 的 comments 槽位同源，改一处即可（两处都要挡：zod 挡大流量，
+          // imageStore 是权威口径，防止绕过 tRPC 直连或未来新增调用点时漏掉）
+          images: z.array(z.string().max(3_000_000)).max(IMAGE_SLOT_LIMITS.comments.maxCount).default([]),
+        }),
+      )
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再评论" });
-        await addComment(ctx.user.id, input.postId, input.content, ctx.user.name ?? input.authorName, ctx.user.name ?? "钓友", input.parentId);
-        return { ok: true };
+        // 评论图片独立预算：只在「真的带图」时扣减，纯文字评论不受影响。
+        // 为什么不在 rateLimit 中间件里做：中间件跑在 input 解析之前拿不到可靠入参，
+        // 无脑叠第二个桶又会误伤文字评论（见 middleware.consumeTokenBucket 的注释）。
+        // 预算刻意比文字评论更紧（5 次/分钟）：带图评论会打满「机审调用 + 磁盘写 + 机审费用」，
+        // 而文字评论只打一次库。
+        if (input.images.length > 0) {
+          await consumeTokenBucket(`rate:posts.comment.images:${actorKey(ctx)}`, {
+            capacity: 5,
+            refillPerSec: 5 / 60,
+            message: "带图评论太频繁了，休息一下",
+          });
+        }
+        return addComment({
+          userId: ctx.user.id,
+          postId: input.postId,
+          content: input.content,
+          authorName: ctx.user.name ?? input.authorName,
+          actorName: ctx.user.name ?? "钓友",
+          parentId: input.parentId,
+          images: input.images,
+        });
       }),
+    // 评论点赞（v14，走 comment_likes 表；返回 likeCount 让徽标以服务端为准）
+    toggleCommentLike: tracedPublic
+      .use(rateLimit({ capacity: 30, refillPerSec: 1, key: actorKey }))
+      .input(z.object({ commentId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再点赞" });
+        return toggleCommentLike(input.commentId, ctx.user.id, ctx.user.name ?? "钓友");
+      }),
+    // 删除评论（v14 软删 + 占位）：评论作者本人或所属帖子作者，越权由 service 抛 FORBIDDEN
+    deleteComment: tracedPublic
+      .use(rateLimit({ capacity: 30, refillPerSec: 30 / 60, key: actorKey }))
+      .input(z.object({ commentId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+        return deleteComment(input.commentId, ctx.user.id);
+      }),
+    // 帖子收藏（v14，归集到 /favorites 的「帖子」Tab）：幂等靠 uq_post_favorite
+    toggleFavorite: tracedPublic
+      .use(rateLimit({ capacity: 30, refillPerSec: 1, key: actorKey }))
+      .input(z.object({ postId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        // 收藏是「以后再看」的个人书签，必须真实登录：匿名走 DEMO_USER 会把书签写进别人账号
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再收藏" });
+        return togglePostFavorite(ctx.user.id, input.postId);
+      }),
+    // 我的收藏-帖子 Tab（游标分页，出参与 feed 卡片同形）
+    myFavorites: tracedPublic
+      .input(z.object({ cursor: cursorSchema, limit: limitSchema(20) }))
+      .query(async ({ ctx, input }) => {
+        // 读接口按真实登录态取互动态（匿名一律 false，见 viewerId 的注释）
+        return myPostFavorites(viewerId(ctx), input);
+      }),
+
     // 帖子删除（软删）：仅作者本人，必须登录
     delete: tracedPublic
       .input(z.object({ postId: z.number() }))
@@ -195,7 +301,9 @@ export const featureRouter = createRouter({
       .input(z.object({
         postId: z.number(),
         content: z.string().min(1).max(1000).optional(),
-        images: z.array(z.string()).optional(),
+        // v14：与 create 同一条落盘链路（dataURL 新图 + 既有 /uploads 路径混排）。
+        // 编辑是「先正常发帖、再往里塞 base64」绕过硬校验的天然后门，这里必须一起挡。
+        images: z.array(z.string().max(3_000_000)).max(IMAGE_SLOT_LIMITS.posts.maxCount).optional(),
         fishSpecies: z.string().optional(),
         weightJin: z.number().optional(),
       }))
@@ -204,11 +312,12 @@ export const featureRouter = createRouter({
         const { postId, ...rest } = input;
         return editPost(ctx.user.id, postId, rest);
       }),
-    // 帖子搜索（v8.7.0）：关键词匹配内容/鱼种，分页
+    // 帖子搜索（v8.7.0）：关键词匹配内容/鱼种，分页。
+    // v14 卡片口径与 feed 对齐后需要 viewerId：liked/collected 只认真实登录态（匿名恒 false，见 viewerId 注释）
     search: tracedPublic
       .input(z.object({ keyword: z.string().min(1).max(64), page: z.number().min(1).default(1), pageSize: z.number().min(1).max(20).default(10) }))
-      .query(async ({ input }) => {
-        return searchPosts(input.keyword, input.page, input.pageSize);
+      .query(async ({ ctx, input }) => {
+        return searchPosts(input.keyword, viewerId(ctx), input.page, input.pageSize);
       }),
     // 关注/取关（v8.7.0）
     toggleFollow: tracedPublic
@@ -228,7 +337,7 @@ export const featureRouter = createRouter({
     followingFeed: tracedPublic
       .input(z.object({ page: z.number().min(1).default(1), pageSize: z.number().min(1).max(20).default(5) }))
       .query(async ({ ctx, input }) => {
-        return followingFeed(uid(ctx), input.page, input.pageSize);
+        return followingFeed(uid(ctx), input.page, input.pageSize, viewerId(ctx));
       }),
     // 粉丝 / 关注列表（viewerId 用真实登录态，匿名 isFollowingBack 恒 false）
     followersList: tracedPublic.query(async ({ ctx }) => {
@@ -237,16 +346,31 @@ export const featureRouter = createRouter({
     followingList: tracedPublic.query(async ({ ctx }) => {
       return followingList(uid(ctx), ctx.user?.id ?? null);
     }),
+    // 评论列表（v14）：游标分页 + 热门/最新双排序，每楼带前 2 条回复预览。
+    // sort 用 default("latest")：老前端不传 sort 时行为与升级前一致（时间倒序）
     comments: tracedPublic
-      .input(z.object({ postId: z.number() }))
-      .query(async ({ input }) => {
-        return listComments(input.postId);
+      .input(
+        z.object({
+          postId: z.number(),
+          sort: z.enum(["latest", "hot"]).default("latest"),
+          cursor: cursorSchema,
+          limit: limitSchema(50),
+        }),
+      )
+      .query(async ({ ctx, input }) => {
+        return listComments(input.postId, { sort: input.sort, cursor: input.cursor, limit: input.limit }, viewerId(ctx));
       }),
-    // 帖子详情页：单帖查询（不存在返回 404）
+    // 楼中楼子回复分页（「查看全部回复」；只有最新一种口径，见 service 注释）
+    commentReplies: tracedPublic
+      .input(z.object({ commentId: z.number(), cursor: cursorSchema, limit: limitSchema(50) }))
+      .query(async ({ ctx, input }) => {
+        return listCommentReplies(input.commentId, { cursor: input.cursor, limit: input.limit }, viewerId(ctx));
+      }),
+    // 帖子详情页：单帖查询（不存在返回 404）+ 当前用户 liked/collected，images 保留全量（详情页要九宫格）
     detail: tracedPublic
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        const post = await getPost(input.id);
+      .query(async ({ ctx, input }) => {
+        const post = await getPostDetail(input.id, viewerId(ctx));
         if (!post) throw new TRPCError({ code: "NOT_FOUND", message: "帖子不存在或已删除" });
         return post;
       }),
@@ -262,7 +386,10 @@ export const featureRouter = createRouter({
       .use(rateLimit({ capacity: 5, refillPerSec: 5 / 60, key: actorKey, message: "发布太频繁，请稍后再试" }))
       .input(z.object({
         content: z.string().min(1).max(1000),
-        images: z.array(z.string()).default([]),
+        // v14：数组元素是压缩后的 dataURL（base64 体积 ≈ 原图 × 1.34），服务端机审 + 落盘，
+        // 库里只存 /uploads/posts/* 的 URL。张数上限与 imageStore 的 posts 槽位同源。
+        // 单元素 3MB 的字符串上限只是粗筛（防超大 body），权威体积口径在 imageStore 里按解码后字节判。
+        images: z.array(z.string().max(3_000_000)).max(IMAGE_SLOT_LIMITS.posts.maxCount).default([]),
         pondSlug: z.string().optional(),
         fishSpecies: z.string().optional(),
         weightJin: z.number().optional(),
@@ -485,13 +612,20 @@ export const featureRouter = createRouter({
 
   // ============ 内容举报与审核（v8.8.0） ============
   moderation: createRouter({
-    // 举报帖子：必须真实登录；同一人同帖幂等（uq_report）
+    // 举报：必须真实登录；同一人对同一目标幂等（uq_report）。
+    // commentId 省略或 0 = 举报整帖；非 0 = 举报该帖下的某条评论（v14）
     report: tracedPublic
       .use(rateLimit({ capacity: 10, refillPerSec: 10 / 60, key: actorKey, message: "举报太频繁，请稍后再试" }))
-      .input(z.object({ postId: z.number(), reason: z.string().min(1).max(255) }))
+      .input(
+        z.object({
+          postId: z.number(),
+          commentId: z.number().optional(),
+          reason: z.string().min(1).max(255),
+        }),
+      )
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再举报" });
-        return reportPost(ctx.user.id, input.postId, input.reason);
+        return reportPost(ctx.user.id, input.postId, input.reason, input.commentId ?? 0);
       }),
     // 审核队列：admin 全站；绑定塘主仅自己钓场的帖子
     list: tracedPublic.query(async ({ ctx }) => {

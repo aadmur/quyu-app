@@ -20,7 +20,9 @@
     "perf:order": "node --import tsx scripts/bench-order-p99.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "db:image-backfill": "node scripts/migrate-post-images.mjs",
+    "db:image-backfill:apply": "node scripts/migrate-post-images.mjs --apply"
   },
   "dependencies": {
     "@capacitor/camera": "^7.0.5",

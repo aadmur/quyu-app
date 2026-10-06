@@ -42,6 +42,24 @@ export const env = {
   /** 专家报告免费体验次数（与基础档免费次数分列记账） */
   fishSpotExpertFreeLimit: optInt("FISH_SPOT_EXPERT_FREE_LIMIT", 1),
 
+  // ── 内容安全 · 阿里云图片机审（v14，AK/Secret 只进服务器 .env，绝不进 APK/代码库） ──
+  // 未配置 Key 或未显式启用时的行为（重要，这是产品决策不是 bug）：
+  // 图片照常落盘、帖子/评论照常发布，同时向 reports 写一条 [系统] 待人工复核记录——
+  // 即「放行 + 标记待审」而不是拒绝发布。理由：现状本来就没有任何图片机审，
+  // fail-closed 会让未开通服务的部署直接丧失发图能力（对照 MOONSHOT_API_KEY 的「服务未开通」降级口径）。
+  // 另：签名实现未经官方 SDK 校正，IMAGE_MODERATION_ENABLED 默认 false，校正后再打开。
+  aliyunAccessKeyId: process.env.ALICLOUD_ACCESS_KEY_ID ?? "",
+  aliyunAccessKeySecret: process.env.ALICLOUD_ACCESS_KEY_SECRET ?? "",
+  aliyunGreenEndpoint: process.env.ALICLOUD_GREEN_ENDPOINT ?? "https://green.cn-shanghai.aliyuncs.com",
+  /** 控制台创建的业务线，留空 = 用默认通用业务 */
+  aliyunGreenBizType: process.env.ALICLOUD_GREEN_BIZ_TYPE ?? "",
+  aliyunGreenScenes: process.env.ALICLOUD_GREEN_SCENES ?? "porn,terrorism,ad",
+  imageModerationEnabled: process.env.IMAGE_MODERATION_ENABLED === "true",
+  /** 单张图片提交超时（并行提交，故一次发布的审核墙钟 ≈ 该值） */
+  imageModerationTimeoutMs: optInt("IMAGE_MODERATION_TIMEOUT_MS", 3_000),
+  /** 整批总预算：fetch 不响应 abort 的极端兜底，超预算未决的图片转人工队列，绝不卡死发布链路 */
+  imageModerationDeadlineMs: optInt("IMAGE_MODERATION_DEADLINE_MS", 8_000),
+
   // ── 哪钓 · 充值 ──
   /** true = 充值立即到账（无需真实支付，仅开发/演示；生产必须 false，否则成自助印钞）。
    *  商户号未就绪期间，运营用 adminCredit 人工加余额。 */

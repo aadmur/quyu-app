@@ -7,12 +7,20 @@
  * - 埋点队列化：曝光/行为事件走 EventQueue 批量异步落库，接口入队即返回（P0）
  * - 多级缓存：recall:hot 候选池（60s）、feed 结果页（30s）、profile（60s，见 profileService）
  * - tracking.user_event 消费者：批量 INSERT user_events + 累加 impression_count + 异步更新画像
+ *
+ * v14 载荷瘦身（与 imageStore 的落盘改造是一对）：
+ * 召回与关注流都改为「显式列 + 首图 cover」，不再 `db.select()` 全列。
+ * 原因是链路性的：候选池 200 行要进 60s 全用户共享缓存，images 列历史上装过 2–4MB 的 base64，
+ * 全列 select 等于把这份体积同时压进 MySQL RTT、进程内存和前端首屏三处。
+ * liked/collected 是**每用户**状态，只能在缓存命中之后再补（见 withUserInteraction 的缓存红线）。
  */
 import { and, desc, gt, inArray, isNull, sql } from "drizzle-orm";
 import { posts } from "@db/schema";
 import { getAnalytics, getCache, getDataSource, getQueue, timedRead, type DomainEvent } from "../infra";
 import { getProfile, updateProfileBatch, type Profile, type ProfileDelta } from "./profileService";
 import { followeeIds } from "./social";
+import { POST_CARD_COLUMNS, postCoverSql, withUserInteraction, type PostCardRow } from "./community";
+
 
 // ---- 权重（抖音式多目标融合，可调参） ----
 const W = {
@@ -60,15 +68,23 @@ function profileScore(post: { fishSpecies: string | null; pondSlug: string | nul
   return s;
 }
 
-type PostRow = typeof posts.$inferSelect;
+/** 召回/关注流共用的帖子列（v14：排除 posts.images，只多带一个首图 cover） */
+const RECALL_COLUMNS = { ...POST_CARD_COLUMNS, cover: postCoverSql };
+
+/** 候选池行 = 帖子卡列（含 cover，用户无关，因此可以安全进全用户共享缓存） */
+export type FeedCard = PostCardRow & { score: number };
+/** feed 出参条目 = 候选池行 + 当前用户互动态（liked/collected 每用户不同，绝不进任何共享缓存） */
+export type FeedItem = FeedCard & { liked: boolean; collected: boolean };
 
 /** 召回：近 30 天活跃帖子（候选池全局共享缓存 60s；冗余列直读，零子查询） */
-async function recallCandidates(): Promise<PostRow[]> {
+async function recallCandidates(): Promise<Array<PostCardRow>> {
   return getCache().getOrSet("recall:hot", RECALL_TTL, async () => {
     const since = new Date(Date.now() - 30 * 24 * 3_600_000);
     return timedRead("recall.hot", (db) =>
       db
-        .select()
+        // v14 显式列出所需列并排除 images（见文件头）：cover 在 SQL 层用 JSON_EXTRACT 取 $[0]，
+        // 遗留的超长 base64 行由 postCoverSql 判为 null，不会把 MB 级字符串拖进共享缓存
+        .select(RECALL_COLUMNS)
         .from(posts)
         // 原生写法：.limit() 内联数字、gt() 走列类型序列化，
         // 避免 sql`` 模板里 LIMIT ? 占位符在 MySQL 预处理下报错（线上 feed 挂掉的根因）
@@ -80,19 +96,33 @@ async function recallCandidates(): Promise<PostRow[]> {
 }
 
 interface Scored {
-  post: PostRow;
+  post: PostCardRow;
   score: number;
 }
 
-/** feed 出参条目：帖子全字段 + 冗余 pondSlug + 打分（与原契约一致） */
-export type FeedItem = PostRow & { pondSlug: string | null; score: number };
 interface FeedPayload {
-  items: FeedItem[];
+  /** 缓存内是用户无关的卡片；返回前由 withUserInteraction 复制出带 liked/collected 的新对象 */
+  items: FeedCard[];
   hasMore: boolean;
 }
 
-/** 信息流推荐主入口：召回 → 粗排 → 精排 → 多样性重排（对外契约与原 recommendFeed 一致） */
-export async function recommendFeed(userId: number, page: number, pageSize = 5) {
+/**
+ * 补齐当前用户互动态（v14）。
+ * 必须同时用在「缓存命中」和「刚算完并写缓存」两条路径上，且**在缓存读写之后**——
+ * MemoryCache 命中返回的是同一对象引用，就地写 liked 会把 A 用户的点赞态固化进缓存、串给 B 用户。
+ */
+async function withUserState(userId: number, items: FeedCard[]): Promise<FeedItem[]> {
+  return withUserInteraction(userId, items);
+}
+
+/**
+ * 信息流推荐主入口：召回 → 粗排 → 精排 → 多样性重排（对外契约与原 recommendFeed 一致）
+ * @param userId 个性化主体（画像 / 关注提权 / 自己的新帖置顶）
+ * @param viewerId 互动态读取者（liked/collected）；默认同 userId。
+ *   路由层匿名访问时会传 0：个性化可以继续按演示账号跑（用户看不见归属），
+ *   但 liked/collected 是「你点过没有」，按演示账号回答就会显式显示错（见 feature-router 的 viewerId）。
+ */
+export async function recommendFeed(userId: number, page: number, pageSize = 5, viewerId = userId) {
   const cache = getCache();
   const seed = page * 31 + userId; // 每页确定性扰动，翻页不重样（与原实现一致）
 
@@ -102,7 +132,8 @@ export async function recommendFeed(userId: number, page: number, pageSize = 5) 
   const profile = await getProfile(userId);
   if (cached) {
     await enqueueImpressions(userId, cached.items);
-    return { ...cached, profile };
+    // 命中缓存同样要补用户态：liked/collected 从来没进过缓存，只能在这里按当前用户现算
+    return { items: await withUserState(viewerId, cached.items), hasMore: cached.hasMore, profile };
   }
 
   const rows = await recallCandidates();
@@ -165,26 +196,34 @@ export async function recommendFeed(userId: number, page: number, pageSize = 5) 
     })),
     hasMore: start + pageSize < result.length,
   };
+  // 先写缓存（用户无关形状），再补当前用户互动态——顺序反了就把用户态固化进缓存
   await cache.set(feedKey, payload, FEED_TTL);
 
   // 曝光事件：异步入队（原实现逐行同步 insert，P0 已改批量队列）
   await enqueueImpressions(userId, payload.items);
 
-  return { ...payload, profile };
+  return { items: await withUserState(viewerId, payload.items), hasMore: payload.hasMore, profile };
 }
 
 /**
  * 关注动态流（QY-COMM-008）：只取我关注作者的非删除帖，created_at 倒序分页。
- * 返回结构与 recommendFeed 的 { items, hasMore } 兼容（items 为 posts 全字段行 + pondSlug/score，
- * 前端复用同一个 mapFeedPost）；未关注任何人 → 直接返回空，不打库。
+ * 返回条目与 recommendFeed 同形（v14：显式列 + cover + liked/collected，不再带 images 数组），
+ * 前端复用同一个 mapFeedPost；未关注任何人 → 直接返回空，不打库。
  * limit pageSize+1 判定 hasMore。
+ * 这条路径没有结果缓存，但同样必须走 RECALL_COLUMNS 的列口径——
+ * 退回 `db.select()` 全列等于把这颗雷的第二半留下。
  */
-export async function followingFeed(userId: number, page: number, pageSize = 5): Promise<FeedPayload> {
+export async function followingFeed(
+  userId: number,
+  page: number,
+  pageSize = 5,
+  viewerId = userId,
+): Promise<{ items: FeedItem[]; hasMore: boolean }> {
   const ids = await getFolloweeIds(userId);
   if (ids.length === 0) return { items: [], hasMore: false };
   const rows = await timedRead("posts.following_feed", (db) =>
     db
-      .select()
+      .select(RECALL_COLUMNS)
       .from(posts)
       .where(and(inArray(posts.authorId, ids), isNull(posts.deletedAt)))
       .orderBy(desc(posts.createdAt))
@@ -192,14 +231,14 @@ export async function followingFeed(userId: number, page: number, pageSize = 5):
       .limit(pageSize + 1),
   );
   const hasMore = rows.length > pageSize;
-  const items: FeedItem[] = rows.slice(0, pageSize).map((post) => ({
+  const cards: FeedCard[] = rows.slice(0, pageSize).map((post) => ({
     ...post,
     pondSlug: post.pondSlug,
-    score: 0, // 时间流无打分，占位保持 FeedItem 契约
+    score: 0, // 时间流无打分，占位保持 FeedCard 契约
   }));
   // 曝光事件：与推荐流同口径异步入队（画像 impression 会略偏，可接受）
-  await enqueueImpressions(userId, items);
-  return { items, hasMore };
+  await enqueueImpressions(userId, cards);
+  return { items: await withUserState(viewerId, cards), hasMore };
 }
 
 async function enqueueImpressions(userId: number, items: Array<{ id: number }>) {

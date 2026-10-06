@@ -12,6 +12,11 @@ import { appendPerfSample, sanitizeSample } from "./lib/perfLog";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
+// bodyLimit 是 HTTP 层的粗筛，刻意保持 50MB 不在本轮收紧：图片以 dataURL 提交，
+// 9 图的 base64 体积 ≈ 磁盘字节 × 1.34，调小会让「大图多张」的正常发布在进 tRPC 之前
+// 就变成裸 413（没有 TRPCError 形状，前端只能显示「网络异常」，用户不知道该减几张图）。
+// 权威口径在应用层：imageStore 按**解码后字节**判单张 3MB / 单次 15MB，超限是带中文提示的 BAD_REQUEST。
+// v14 图片落盘后，这个值只影响瞬时内存，不再决定数据库行大小与 feed 载荷（那才是这颗雷的真正位置）。
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
 app.get(Paths.oauthNonce, createOAuthNonceHandler());
 app.get(Paths.oauthCallback, createOAuthCallbackHandler());
@@ -35,8 +40,9 @@ app.post(Paths.perf, async (c) => {
 app.post(Paths.payNotify, async (c) => {
   return c.json({ error: "payment gateway not configured" }, 503);
 });
-// 用户上传目录（头像等）：独立于 dist/public（vite build 的 emptyOutDir 会清空 dist），
-// root "./" 相对 process.cwd()，由 profileService 写入 <cwd>/uploads/avatars。
+// 用户上传目录（头像/封面/帖子图/评论图）：独立于 dist/public（vite build 的 emptyOutDir 会清空 dist），
+// root "./" 相对 process.cwd()，由 profileService 写 <cwd>/uploads/{avatars,covers}、
+// imageStore 写 <cwd>/uploads/{posts,comments}（帖子/评论图片 v14 起落盘，库里只存这里的 URL）。
 app.use("/uploads/*", serveStatic({ root: "./" }));
 app.use("/api/trpc/*", async (c) => {
   // 真实连接 IP（node-server 绑定；dev-server 下无 bindings 则为 undefined）。

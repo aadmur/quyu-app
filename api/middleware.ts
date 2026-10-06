@@ -91,19 +91,33 @@ export interface RateLimitOptions {
 
 export function rateLimit(opts: RateLimitOptions) {
   return t.middleware(async ({ ctx, path, next }) => {
-    const cache = getCache();
-    const dim = `rate:${path}:${opts.key(ctx)}`;
-    const now = Date.now();
-    const bucket = (await cache.get<Bucket>(dim)) ?? { tokens: opts.capacity, updatedAt: now };
-    const tokens = Math.min(opts.capacity, bucket.tokens + ((now - bucket.updatedAt) / 1000) * opts.refillPerSec);
-    if (tokens < 1) {
-      await cache.set(dim, { tokens, updatedAt: now }, Math.ceil(opts.capacity / opts.refillPerSec) * 2);
-      log("warn", "rate limited", { route: path, userId: ctx.user?.id });
-      throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: opts.message ?? "请求过于频繁，请稍后再试" });
-    }
-    await cache.set(dim, { tokens: tokens - 1, updatedAt: now }, Math.ceil(opts.capacity / opts.refillPerSec) * 2);
+    // dim 组装留在中间件里：path 只有中间件知道，resolver 侧调用要自己把完整 dim 拼出来
+    await consumeTokenBucket(`rate:${path}:${opts.key(ctx)}`, opts);
     return next();
   });
+}
+
+/**
+ * 令牌桶扣减（rateLimit 的底层实现，也供路由层在 resolver 里显式调用）。
+ * 为什么要单独导出函数版：有些预算必须**按入参内容**决定是否扣减——例如 posts.comment 的
+ * 「评论配图」独立预算：纯文字评论不该被图片预算误伤。而 tRPC 中间件跑在 input 解析之前
+ * （opts.input 是未校验的原始值，不可靠），拿不到干净的 input，只能把判定下沉到 resolver。
+ * 语义与 rateLimit 逐字一致（同一份桶存储、同一个 refill 算法、同样抛 TOO_MANY_REQUESTS）。
+ */
+export async function consumeTokenBucket(
+  dim: string,
+  opts: { capacity: number; refillPerSec: number; message?: string },
+): Promise<void> {
+  const cache = getCache();
+  const now = Date.now();
+  const bucket = (await cache.get<Bucket>(dim)) ?? { tokens: opts.capacity, updatedAt: now };
+  const tokens = Math.min(opts.capacity, bucket.tokens + ((now - bucket.updatedAt) / 1000) * opts.refillPerSec);
+  if (tokens < 1) {
+    await cache.set(dim, { tokens, updatedAt: now }, Math.ceil(opts.capacity / opts.refillPerSec) * 2);
+    log("warn", "rate limited", { route: dim });
+    throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: opts.message ?? "请求过于频繁，请稍后再试" });
+  }
+  await cache.set(dim, { tokens: tokens - 1, updatedAt: now }, Math.ceil(opts.capacity / opts.refillPerSec) * 2);
 }
 
 export const authedQuery = t.procedure.use(requireAuth);
