@@ -14,8 +14,8 @@
  * 首屏因而可以安全地只带 domAnimation，节省 11.9 KB brotli。
  *
  * 还有一个反直觉的实测结果：`drag="y"` 属性本身几乎不增加体积（27,483 B vs
- * 27,467 B），贵的是**能力包**。因此首屏的 CommentSheet / StoryPlayer 用自研
- * 的 Pointer Events 抽屉（components/home/BottomSheet.tsx）复刻下拉关闭，
+ * 27,467 B），贵的是**能力包**。因此首屏的 StoryPlayer 与 v14 的帖子弹层 PostSheet
+ * 用自研的 Pointer Events 抽屉（components/home/BottomSheet.tsx）复刻下拉关闭，
  * 既不引入 domMax，也不牺牲交互。
  *
  * 使用约定：

@@ -11,22 +11,50 @@ interface CatchViewerProps {
   index: number | null
   onChange: (index: number) => void
   onClose: () => void
+  /**
+   * 作者信息（v14）：迭代前这里恒取 PROFILE（即「我的」页本人档案），
+   * 浏览别人的帖子时头像昵称全是错的。帖子弹层/详情页必须把真实作者传进来。
+   */
+  author?: { name: string; avatar: string }
+  /**
+   * 受控点赞（v14）：传入 onLike 后底部鱼图标走调用方的真实点赞，
+   * 不再维护组件内部的假 liked（否则退出浏览器就忘了自己点没点过）。
+   */
+  onLike?: () => void
+  /** 配合 onLike 使用：当前是否已赞 */
+  liked?: boolean
+  /** 点赞请求在途：禁用鱼图标防连点 */
+  likePending?: boolean
 }
 
 /** 渔获墙全屏浏览：黑底，图居中，顶部 X，底部点赞评论栏，左右滑动切换 */
-export default function CatchViewer({ items, index, onChange, onClose }: CatchViewerProps) {
-  const [liked, setLiked] = useState(false)
+export default function CatchViewer({
+  items,
+  index,
+  onChange,
+  onClose,
+  author,
+  onLike,
+  liked,
+  likePending,
+}: CatchViewerProps) {
+  const [localLiked, setLocalLiked] = useState(false)
   const item = index === null ? null : items[index]
+  // 受控模式（帖子浏览）用调用方给的点赞态；非受控（我的渔获墙）保留原演示态
+  const controlled = onLike != null
+  const likedValue = controlled ? !!liked : localLiked
+  const name = author?.name ?? PROFILE.name
+  const avatar = author?.avatar ?? PROFILE.avatar
 
   const prev = () => {
     if (index !== null && index > 0) {
-      setLiked(false)
+      setLocalLiked(false)
       onChange(index - 1)
     }
   }
   const next = () => {
     if (index !== null && index < items.length - 1) {
-      setLiked(false)
+      setLocalLiked(false)
       onChange(index + 1)
     }
   }
@@ -107,9 +135,9 @@ export default function CatchViewer({ items, index, onChange, onClose }: CatchVi
               style={{ paddingBottom: 'max(var(--safe-bottom), 32px)' }}
             >
               <div className="flex items-center gap-2">
-                <img src={PROFILE.avatar} alt={PROFILE.name} className="h-8 w-8 rounded-full object-cover" />
+                <img src={avatar} alt={name} className="h-8 w-8 rounded-full object-cover" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-semibold leading-[18px] text-white">{PROFILE.name}</p>
+                  <p className="text-[13px] font-semibold leading-[18px] text-white">{name}</p>
                   <p className="truncate text-[12px] leading-[16px] text-white/60">
                     {item.caption} · {item.time}
                   </p>
@@ -118,20 +146,22 @@ export default function CatchViewer({ items, index, onChange, onClose }: CatchVi
               <div className="mt-3 flex items-center gap-6 border-t border-white/10 pt-3 text-white">
                 <button
                   type="button"
-                  onClick={() => setLiked((v) => !v)}
-                  className="flex items-center gap-1.5"
+                  aria-label={likedValue ? '取消点赞' : '点赞'}
+                  disabled={likePending}
+                  onClick={() => (controlled ? onLike?.() : setLocalLiked((v) => !v))}
+                  className="flex items-center gap-1.5 disabled:opacity-50"
                 >
                   <m.span
-                    key={String(liked)}
+                    key={String(likedValue)}
                     initial={{ scale: 0.6 }}
                     animate={{ scale: 1 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 15 }}
-                    className={liked ? 'text-heart' : 'text-white'}
+                    className={likedValue ? 'text-heart' : 'text-white'}
                   >
-                    <FishIcon active={liked} size={22} />
+                    <FishIcon active={likedValue} size={22} />
                   </m.span>
                   <span className="font-num text-[15px] leading-none">
-                    {(item.likes + (liked ? 1 : 0)).toLocaleString('en-US')}
+                    {(item.likes + (likedValue && !controlled ? 1 : 0)).toLocaleString('en-US')}
                   </span>
                 </button>
                 <span className="flex items-center gap-1.5">

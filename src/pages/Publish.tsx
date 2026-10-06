@@ -55,13 +55,15 @@ export default function Publish() {
     window.setTimeout(() => navigate(to), 380)
   }
 
-  // 真实发帖：调 posts.create，成功后让首页信息流重新拉取
+  // 真实发帖：调 posts.create，成功后只让首页信息流的**第一页**重新拉取
+  // （v14：不再 feed.invalidate() 整键失效 —— 那会把用户刷过的每一页全部重请求一遍）
   const utils = trpc.useUtils()
   const createPostMut = trpc.app.posts.create.useMutation({
     onSuccess: () => {
       setPublishing(false)
       showToast(PUBLISH_SUCCESS_TOAST)
-      utils.app.feed.invalidate()
+      void utils.app.feed.invalidate({ page: 1 })
+      void utils.app.posts.followingFeed.invalidate({ page: 1 })
       closeAndGo('/')
     },
     onError: (e) => {

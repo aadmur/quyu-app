@@ -9,8 +9,9 @@
  *   m + domMax（含 drag + layout）      132,772 B   br 39,338 B   ← 但**能力包**要 +39 KB
  *
  * 也就是说：拖拽手势本身不花钱，贵的是 domMax 能力包（layout 投影系统 + 手势引擎）。
- * 而 CommentSheet / StoryPlayer 都位于**首屏静态闭包**（Home → StoryBar/FeedPost），
- * 一旦为了 drag 引入 domMax，QY-PERF-005 的全部收益（11.9 KB brotli）即刻归零。
+ * 而 StoryPlayer / PostSheet 都位于**首屏可达路径**上（Home → StoryBar/FeedPost，
+ * v14 的帖子弹层也从 Home 打开），一旦为了 drag 引入 domMax，
+ * QY-PERF-005 的全部收益（11.9 KB brotli）即刻归零。
  *
  * 因此这里用 Pointer Events + CSS 复刻「下拉关闭」：
  * - 关闭阈值与原先一致：位移 > 120px（Story 为 90px）或速度 > 500px/s

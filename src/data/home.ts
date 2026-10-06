@@ -50,11 +50,24 @@ export interface FeedPost {
   official?: boolean
   time: string
   location?: string
-  images: string[]
+  /**
+   * 列表卡片封面（v14）：feed 接口瘦身后只回传首图，不再透传 images 数组。
+   * 原因为带宽而非美观：真实用户一条 9 图帖是 2-4MB base64，全量透传会把首页
+   * 从 189KB 推到 MB 级。全量图片在用户点开帖子时由 posts.detail 单独请求。
+   */
+  cover: string | null
   caption: string
   likes: number
   commentCount: number
+  /**
+   * 卡片评论预览。真实帖子的这个数组恒为空 —— feed 不再透传评论，
+   * 预览改由 lib/commentPreview.ts 的本地旁路补上（见该文件注释）。
+   */
   comments: FeedComment[]
+  /** 服务端点赞态（v14）：演示帖没有后端，缺省 undefined 时退化为本地态 */
+  liked?: boolean
+  /** 服务端收藏态（v14）：同上 */
+  collected?: boolean
   /** 钓点挂载条 */
   spot?: { id: string; name: string; price: number }
 }
@@ -66,7 +79,7 @@ export const FEED_POSTS: FeedPost[] = [
     avatar: '/avatar-1.png',
     time: '2 小时前',
     location: '青龙湾生态钓场',
-    images: ['/feed-1.webp'],
+    cover: '/feed-1.webp',
     caption: '凌晨四点半的翘嘴，6.8 斤，值了！🎣 #早口 #翘嘴',
     likes: 1283,
     commentCount: 86,
@@ -83,7 +96,7 @@ export const FEED_POSTS: FeedPost[] = [
     avatar: '/avatar-2.webp',
     time: '3 小时前',
     location: '青龙湾生态钓场',
-    images: ['/feed-2.webp'],
+    cover: '/feed-2.webp',
     caption: '青龙湾 12 号位，一下午 23 尾鲫鱼，口给得真好 #鲫鱼 #青龙湾',
     likes: 862,
     commentCount: 54,
@@ -99,7 +112,7 @@ export const FEED_POSTS: FeedPost[] = [
     avatar: '/avatar-3.webp',
     time: '5 小时前',
     location: '鹭岛湖路亚基地',
-    images: ['/feed-3.webp'],
+    cover: '/feed-3.webp',
     caption: '新竿开光，第一尾就是鳜鱼！这竿腰力绝了 #路亚 #鳜鱼',
     likes: 1507,
     commentCount: 112,
@@ -116,7 +129,7 @@ export const FEED_POSTS: FeedPost[] = [
     official: true,
     time: '6 小时前',
     location: '武汉 · 江夏',
-    images: ['/feed-4.webp'],
+    cover: '/feed-4.webp',
     caption: '本周钓点推荐：青龙湾生态钓场。今早 6 点放鲫鱼 800 斤，开口好，速来！黄昏的青龙湾，随手一拍都是大片。',
     likes: 3204,
     commentCount: 238,
@@ -134,7 +147,7 @@ export const FEED_POSTS: FeedPost[] = [
     avatar: '/feed-5.webp',
     time: '8 小时前',
     location: '老周家斤塘',
-    images: ['/feed-5.webp'],
+    cover: '/feed-5.webp',
     caption: '夜钓的魅力：全世界只剩下你和那一目红 #夜钓 #浮漂',
     likes: 976,
     commentCount: 67,
@@ -149,7 +162,7 @@ export const FEED_POSTS: FeedPost[] = [
     avatar: '/avatar-7.webp',
     time: '12 小时前',
     location: '云溪谷休闲钓园',
-    images: ['/feed-6.webp'],
+    cover: '/feed-6.webp',
     caption: '草鱼入护瞬间，这水花我能看一百遍 #草鱼 #大物',
     likes: 2118,
     commentCount: 143,
@@ -165,7 +178,7 @@ export const FEED_POSTS: FeedPost[] = [
     avatar: '/avatar-4.webp',
     time: '昨天',
     location: '老周家斤塘',
-    images: ['/feed-7.webp'],
+    cover: '/feed-7.webp',
     caption: '带孙子来体验，小家伙比我有耐心 #亲子 #传承',
     likes: 1764,
     commentCount: 95,

@@ -76,12 +76,18 @@ function Lazy({ children }: { children: ReactNode }) {
  *   shop       → CategoryTabs.tsx layoutId="shop-cat-pill"
  *   me         → Profile.tsx      layoutId="role-pill" / useMotionValue
  *   me/follows → FollowList.tsx   layoutId="follow-list-tab-indicator"
+ *   post/:id   → PostContent.tsx  → CatchViewer.tsx drag="x"（v14 图片放大浏览）
  *   owner      → WeekChart.tsx    layoutId="week-metric-pill"
  *                StatsGrid.tsx    useMotionValue + useTransform + animate()
  *   moderation → Moderation.tsx   layoutId="moderation-tab"
  *
  * 其余懒加载页只用基础过渡，能力由 Layout 的 MotionFeatures(domAnimation)
  * 覆盖，不需要再加边界。
+ *
+ * 注意 /post/:id 这一条是 v14 新加的：帖子详情从「路由页」降级为「深链冷启动专用」，
+ * 列表内点帖子改走 Home 的 PostSheet 弹层。两处共用 PostContent，而 PostContent 里
+ * 的看图组件 CatchViewer 用了 drag="x"，所以路由页必须进这份名单（弹层则在
+ * PostSheet 内部自己包一层 MotionFeaturesMax，domMax 只在用户真点开帖子时下载）。
  */
 function LazyMax({ children }: { children: ReactNode }) {
   return (
@@ -101,7 +107,8 @@ export default function App() {
         {/* 二级页：按需加载 */}
         <Route path="spots" element={<LazyMax><Spots /></LazyMax>} />
         <Route path="pond/:id" element={<Lazy><PondDetail /></Lazy>} />
-        <Route path="post/:id" element={<Lazy><PostDetail /></Lazy>} />
+        {/* 帖子详情（v14 起只服务深链冷启动）：PostContent → CatchViewer 用了 drag，需要 domMax */}
+        <Route path="post/:id" element={<LazyMax><PostDetail /></LazyMax>} />
         <Route path="checkout" element={<LazyMax><Checkout /></LazyMax>} />
         <Route path="tickets" element={<LazyMax><Tickets /></LazyMax>} />
         <Route path="favorites" element={<Lazy><Favorites /></Lazy>} />

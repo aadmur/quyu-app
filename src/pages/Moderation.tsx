@@ -24,6 +24,10 @@ interface QueueItem {
     cover: string | null
     pondSlug: string | null
   }
+  /** 0 = 整帖举报；非 0 = 评论举报（v14） */
+  commentId: number
+  /** 评论举报时的目标评论内容与作者；整帖举报为 null */
+  comment: { id: number; content: string; authorName: string } | null
 }
 
 /** 入驻申请条目（与 api/services/pondApplication.ts ApplicationQueueItem 对齐） */
@@ -241,14 +245,24 @@ export default function Moderation() {
   const forbidden = !!listQuery.error && errCode(listQuery.error) === 'FORBIDDEN'
   const items = (listQuery.data ?? []) as QueueItem[]
 
-  /** 处理举报：忽略 / 下架帖子；CONFLICT = 已被他人处理，如实提示后刷新 */
+  /**
+   * 处理举报：忽略 / 下架目标；CONFLICT = 已被他人处理，如实提示后刷新。
+   * `isComment` 只决定文案——服务端按 reports.comment_id 自行判定下架对象是评论还是整帖，
+   * 前端不传目标类型，避免被篡改成"用评论举报的额度删掉别人的帖子"。
+   */
   const handle = useCallback(
-    (reportId: number, action: 'ignore' | 'delete') => {
+    (reportId: number, action: 'ignore' | 'delete', isComment: boolean) => {
       handleMut.mutate(
         { reportId, action },
         {
           onSuccess: () => {
-            showToast(action === 'delete' ? '帖子已下架' : '已忽略该举报')
+            showToast(
+              action === 'delete'
+                ? isComment
+                  ? '评论已下架，所属帖子保留'
+                  : '帖子已下架'
+                : '已忽略该举报',
+            )
             utils.app.moderation.list.invalidate()
           },
           onError: (e) => {
@@ -400,6 +414,21 @@ export default function Moderation() {
                   </div>
                 </div>
 
+                {/*
+                  评论举报上下文（v14）：被举报的具体评论引在帖子之下。
+                  审核员需要看到原话才能判断，光看"有人举报这条帖子"无法处置。
+                */}
+                {r.comment && (
+                  <div className="mt-3 rounded-xl border-l-2 border-heart/40 bg-paper px-3 py-2">
+                    <p className="text-[11px] leading-4 text-ink-40">
+                      被举报评论 · {r.comment.authorName || `用户 #${r.comment.id}`}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-[19px] text-ink">
+                      {r.comment.content}
+                    </p>
+                  </div>
+                )}
+
                 {/* 举报信息行 */}
                 <div className="mt-3 flex items-center justify-between rounded-xl bg-paper px-3 py-2">
                   <span className="text-[12px] leading-4 text-ink-60">
@@ -414,7 +443,7 @@ export default function Moderation() {
                 <div className="mt-3 flex gap-2">
                   <button
                     type="button"
-                    onClick={() => handle(r.id, 'ignore')}
+                    onClick={() => handle(r.id, 'ignore', !!r.comment)}
                     disabled={handleMut.isPending}
                     className="h-9 flex-1 rounded-full border border-line text-[13px] font-semibold text-ink-60 active:brightness-95 disabled:opacity-40"
                   >
@@ -422,11 +451,17 @@ export default function Moderation() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handle(r.id, 'delete')}
+                    onClick={() => handle(r.id, 'delete', !!r.comment)}
                     disabled={handleMut.isPending}
                     className="flex h-9 flex-1 items-center justify-center rounded-full bg-heart text-[13px] font-semibold text-paper-white active:brightness-95 disabled:opacity-40"
                   >
-                    {handleMut.isPending ? <Loader2 size={15} className="animate-spin" /> : '下架帖子'}
+                    {handleMut.isPending ? (
+                      <Loader2 size={15} className="animate-spin" />
+                    ) : r.comment ? (
+                      '下架评论'
+                    ) : (
+                      '下架帖子'
+                    )}
                   </button>
                 </div>
               </m.li>
