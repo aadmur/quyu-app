@@ -6,7 +6,7 @@
  * 内容安全只接受图片 URL，所以违规图必然已经落盘过一次；"删干净"这一步没做到的话，
  * 生产上就会留下"公网能访问、库里没有引用"的违规孤儿文件。这条是本模块唯一真正的安全边界。
  */
-import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -83,6 +83,22 @@ describe("机审四态对磁盘的影响", () => {
     ).rejects.toMatchObject({ code: "BAD_REQUEST", message: expect.stringContaining("第 2 张图片涉嫌违规") });
 
     expect(snapshot()).toEqual(before);
+  });
+
+  it("reject 只回滚本次新写的文件，不得伤及同批里既有图片（编辑场景的误删面）", async () => {
+    // 先放一张"已经在线上的旧图"，模拟用户编辑旧帖时把原图地址原样带回
+    const oldFile = "legacy-9999.png";
+    const oldAbs = path.join(postsDir, oldFile);
+    writeFileSync(oldAbs, "old-bytes");
+    moderateImagesMock.mockResolvedValue(verdicts("pass", "reject"));
+
+    await expect(
+      ingestImages([`/uploads/posts/${oldFile}`, PNG_1PX, PNG_1PX], { slot: "posts", userId: 4008, kind: "post" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+    // 删掉用户既有图片的话，一次失败的编辑就会升级成数据丢失事故
+    expect(existsSync(oldAbs)).toBe(true);
+    rmSync(oldAbs, { force: true });
   });
 
   it("review / unavailable 都计入待人工复核，文件保留", async () => {
