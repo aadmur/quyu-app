@@ -2,6 +2,124 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/) 与 [Keep a Changelog](https://keepachangelog.com/zh-CN/) 规范。
 
+## [v8.12.0] - 2026-10-06 「帖子交互专项」（迭代计划 v14，A+B+C 全量，一次性交付）
+
+> 状态：🟡 **编码与本地验收完成，尚未上线生产**。需求对齐见 `docs/产品/迭代计划-v14-草案.md`，
+> 术语裁定见 `CONTEXT.md`，不可逆决策见 `docs/adr/0001~0005`，运维与验收证据见
+> `docs/NEXT-ITERATION.md` 第九节。
+> ⚠️ **上线顺序硬约束**：必须先执行 `0013` + `0014` 迁移，再切 dist。新代码硬依赖
+> `comments.{author_avatar,images,like_count,deleted_at}`、`comment_likes`、`post_favorites`、
+> `reports.comment_id`，缺任一会在运行期报错。
+> 主线：把「打开帖子」从路由跳转改为**全屏弹层**，顺手拆掉**帖子图片 base64 入库**这颗雷，
+> 并把评论区从"能看"做到"能用"。
+
+### 一、架构改动（ADR-0001 / 0002 / 0004 / 0005）
+
+- **列表内点击帖子 → PostSheet 全屏弹层 + URL 同步**：打开时 `pushState` 到 `/post/:id`、关闭时
+  `history.back()`；`/post/:id` 路由保留只服务深链冷启动。两者共用 `PostContent`，
+  **不存在两套渲染**（`PostDetail.tsx` 从 696 行降到 42 行）。根因：`/` 与 `/post/:id` 是
+  `Layout` 下兄弟路由，走 `navigate` 会把 Home 整棵卸载，分页累积/滚动位置/tab/点赞态全丢。
+- **图片 hero 共享元素转场技术上不可行**（不是没做）：它要求列表项与详情页两侧都挂 `layoutId`，
+  而 `FeedPost` 在首屏静态闭包内，`check-motion-boundary.mjs` 禁止，违规即 build 失败。
+  最终做 idle 预加载 + 纯 CSS `translateY` 上滑；`PostSheet` 独立 chunk 仅 **2.21 kB**（gzip）。
+- **删除 `CommentSheet`（-150 行）**：它平铺展示、完全忽略 `parentId`，与详情页的两层楼中楼树是
+  「同一份数据两种形态」，且乐观追加靠"作者+内容"字符串去重（同名同文会误删）。
+  列表页评论按钮改为开弹层并聚焦输入框。
+- **整卡可点 + 信息流取消双击点赞**（单击零延迟）；弹层/详情页内保留双击并修了时序 bug。
+- **帖子图片改为磁盘落盘**，不再 base64 入库（详见下方「拆弹」）。
+- **评论点赞新建 `comment_likes` 独立表**，不复用 `likes`（后者是 post 专用且 B-06 记有事务隐患）。
+
+### 二、拆弹（QY-PERF-009/010）：帖子图片 base64 入库
+
+`pickImages()` 返回 dataURL → `Publish.tsx` 原样传入 → `createPost` 直接写进 `posts.images`
+JSON 列；项目**没有** `/api/upload`、无大小校验，`bodyLimit` 50MB 等于不设防。
+至今没炸只是因为生产库里几乎都是 seed 的静态路径 `/feed-N.webp`。
+
+- `recallCandidates()` 原为 `db.select()` **全列**含 images，一次拉 `RECALL_LIMIT` 条进
+  **进程内存共享缓存**；`mapFeedPost` 又全量透传前端。真实用户发 9 图帖 ≈ 2-4MB 挤一行 JSON，
+  首页传输会从 189KB 涨到 MB 级、v12 性能专项成果当场归零。
+- 现在：`imageStore.ts` 落盘 `uploads/posts`/`uploads/comments`（沿用 `profileService` 已有链路），
+  `recallCandidates` 改显式列排除 images，**feed/搜索/关注/收藏四类卡片统一只带 `cover`**。
+- `postCoverSql` 对首图 **>512 字符判 null**（实测 300KB 与 623 字符的 base64 都被挡住），
+  代价是遗留 base64 帖在信息流里**没有封面**，需靠 `scripts/migrate-post-images.mjs` 回填（B-14）。
+- 搜索载荷实测体积 **5.5KB → 1.7KB（−69.2%）**；并补上 LIKE 通配符转义（此前搜 `%` 会捞出整表）。
+
+### 三、评论区能力
+
+游标分页 `(createdAt,id)`（原硬截断 50 条，第 51 条起永久不可见）；**热门/最新双排序**
+（两套游标物理隔离，各走 `idx_comments_post_created` / `idx_comments_post_like`）；
+楼中楼每楼预览 2 条 + 子回复分页；评论点赞；删自己评论=软删 + 「该评论已删除」占位且**不塌楼**；
+真实头像（新增 `comments.author_avatar`，废除 `(userId+id)%7` 假算法）；评论图片；评论级举报。
+
+### 四、术语裁定
+
+**「渔获集」是幽灵术语，禁止使用** —— 它从未对应任何表/页面/功能，只存在于一句 toast 文案里，
+而 `/favorites` 标题是「我的收藏」且只收钓场。收藏文案统一为「已收藏」，
+帖子收藏归集到 `/favorites` 新增的「帖子」Tab（新表 `post_favorites`）。
+
+### 五、合规（ADR-0003）
+
+接入阿里云内容安全图片机审。**官方已核实**：按量付费通用版 $0.6/千次（高级 1.2 / 入华 0.7），
+API 支持 URL 或二进制提交、**图片无需公网可访问**，所以审核能真正发生在落盘之前。
+⚠️ **`IMAGE_MODERATION_ENABLED` 默认 false**：ROA 签名与请求体字段名**尚未联调验证**，
+函数上留有 `TODO(签名校正)`。未配置时降级为「放行 + 写 `reports` 待人工复核」——
+这是产品决策不是技术决策，代价是审核队列随带图发布增长。签名错的后果是 4xx→走降级，
+不会误伤发布，但**也不等于机审已生效**。
+
+### 六、本地验收证据（全部为实测，非纸面推断）
+
+- **静态门禁全绿**：`tsc -b` 0 错、`eslint .` 0 problem、`check-fonts`/`check-images`/
+  `check-perf-wiring`/`check-knowledge` 全 PASS、`vite build` 成功、
+  `check-motion-boundary` 四项不变量 PASS（首屏闭包 62 → 67 文件，`PostDetail` 升入 `LazyMax`，
+  domMax 未泄漏进首屏 chunk）。全仓 `as any` **0 处**。
+- **首屏 189.5 KB br**（v13 基线 189.0 → **+0.5 KB / +0.3% 微回退**，未粉饰）；
+  主 JS br 51.9（预算 ≤70）、CSS br 6.4（≤12）、字体 34.4（≤40）均在红线内。
+- **`smoke-static.mjs` 全部通过**（含 QY-PERF-008 埋点六项断言、ETag/304、按需 chunk 校验）。
+- **迁移**：隔离 MySQL 26.7 按「生产真实路径」（drizzle 0000-0010 + 直跑版 0011→0014）重放，
+  与 drizzle 全量比对仅 2 处**刻意保留**差异（`comments.images` 默认值）；四个直跑版重跑两次幂等。
+- **接口运行时**：隔离库起 `NODE_ENV=production` 服务打 tRPC，**39 项断言通过**
+  （游标分页零重叠、`replyCount` 聚合、软删不塌楼、热门排序、`liked/collected` 回显、
+  评论级举报与守卫、**图片落盘发帖+评论双链路实测端到端**：base64 进 → `/uploads/*` 出 → HTTP 200）。
+- **回填工具四条路径实测**：dry-run / `--apply` / 幂等重跑 / `--rollback` 全部符合预期。
+
+### 七、顺手修掉的非本轮问题
+
+- `0011_fish_spot_run.sql` 三行裸 `CREATE INDEX` 使其**根本不可重跑**（第二次报
+  `Duplicate key name`），与自身声明的"幂等"矛盾，恢复演练会在第 38 行中断 → 已补守卫。
+- 修正了 `0013_run.sql` 头注释里一条**错误的理由**：无默认值的 `ADD images json NOT NULL`
+  实测**不报错**，而是把历史行静默填成 `NULL`、违反自身 NOT NULL 声明（前端拿到 null 会崩且
+  极难归因）；CI 跑空库永远发现不了这一点。
+- 修正 `smoke-static.mjs` 的两个静默失效条件（缺 env 时服务起不来；3100 被占时会**测到别的服务**
+  且体积/图片照样全绿）——已写入运维文档。
+- `BottomSheet` 缺失的可用性补齐：PostSheet 加下拉把手（也是唯一可拖锚点）+ Escape 关闭；
+  并用 ref 做关闭幂等守卫，避免连按 Escape 触发两次 `history.back()` 把用户甩出首页。
+
+### 八、明确未做 / 已知边界
+
+- feed 本体 offset→游标 **B-10 仍在**（本轮只做了评论游标分页）。
+- 存量 base64 回填**未执行**（工具就绪，取决于生产预检命中行数；见下）。
+- 渔获墙 / 审核队列仍全列读 `posts.images`（**B-18/B-19**）：前者是真缺陷（2-4MB 白传给客户端，
+  且四个统计查询都漏了 `isNull(posts.deletedAt)`）；后者刻意保留但出参只透出第 0 张，
+  违规图若在九宫格后段则审核员看不到。
+- 评论计数两套口径同屏（**B-17**）；`pickImages` Web 回退对损坏文件会永久 pending（**B-20**，
+  先前就存在、本轮扩大暴露面）；顶层「加载更多」失败后是死按钮（**B-21**）。
+- **热门排序游标漂移已实测量化**：锚点期间某条被刷高赞会使其从下一页**漏 1 条、重复 0 条、
+  不串页**，属有界退化（见 `docs/NEXT-ITERATION.md` 第五节）。
+- 楼内「展开更多」在底部、拉出的是更老的回复、位置出现在按钮上方 —— 前端无法在不牺牲
+  阅读顺序的前提下修掉，已在 `commentTree.ts` 注释里记为结构性取舍。
+
+### 九、上线前必须由你完成
+
+1. 生产库跑迁移面预检（两条已实测可用的 SQL 见 `docs/NEXT-ITERATION.md` 第九节），
+   据此决定是否需要执行 `db:image-backfill`。
+2. 阿里云内容安全：开通 + 配 AK/Secret + **联调校正签名**，并拍板"机审不可达时
+   fail-closed 还是 fail-open"。
+3. **真机目检**（本地无库、起不了有效前端会话，以下我无法代验）：弹层下拉关闭手感、
+   键盘弹起时评论输入框是否完整可见、安卓返回键、图片横滑与单击放大是否误拦、
+   排序 Tab 下划线对齐、搜索结果卡片是否有图。
+
+
+
 ## [v8.11.0] - 2026-10-04 「哪钓专业化」（迭代计划 v13，C1~C7 全量）
 
 > 状态：**已于 2026-10-04 17:31 (CST) 上线生产**（本地/库级验收 48+56 项全通过后热更新；见下方「部署记录」）。
