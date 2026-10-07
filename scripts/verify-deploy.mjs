@@ -30,7 +30,24 @@ import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 const shasum = (b) => createHash('sha256').update(b).digest('hex')
 // Git Bash 的 tar 会把 E:\tmp\x.tar 读成"远程主机 E:"，传给孩子进程前先转 /e/tmp/x.tar
-const forSh = (p) => p.replace(/\\/g, '/').replace(/^([A-Za-z]):\/+/, (_m, d) => '/' + d.toLowerCase() + '/')
+// tar 的路径形式取决于实际命中的是哪个 tar：Git Bash 的 MSYS tar 认 /e/tmp/x.tar（见 `E:\tmp`
+// 会当成"远程主机 E:"），System32 的 bsdtar 认 E:/tmp/x.tar（见 /e/… 报 Cannot open）。
+// 部署那一刻不该因为这种环境问题给出假 FAIL，所以两种形式各试一次，取能读通的那种。
+const tarForms = [
+  (p) => p.replace(/\\/g, '/').replace(/^([A-Za-z]):\/+/, (_m, d) => '/' + d.toLowerCase() + '/'),
+  (p) => p.replace(/\\/g, '/'),
+]
+const tarMemberBytes = (archive, member) => {
+  let lastErr
+  for (const f of tarForms) {
+    try {
+      return execFileSync('tar', ['-xzOf', f(archive), member], { maxBuffer: 64 * 1024 * 1024 })
+    } catch (e) {
+      lastErr = e
+    }
+  }
+  throw lastErr
+}
 
 let failed = 0
 let skipped = 0
@@ -103,7 +120,7 @@ const safeFetch = async (url, opts) => {
           // URL 里的 /assets/… 在包内是 dist/public/assets/…——直接拿 URL 当包内成员名会取不到，
           // 而"取不到"长得非常像"比对失败"，这条区分必须做对（第一版就踩了）。
           const member = 'dist/public' + m[0]
-          const want = shasum(execFileSync('tar', ['-xzOf', forSh(tarPath), member], { maxBuffer: 64 * 1024 * 1024 }))
+          const want = shasum(tarMemberBytes(tarPath, member))
           const remote = await fetch(`${base}${m[0]}`, { headers: headers({ 'Accept-Encoding': 'br' }) })
           const got = shasum(Buffer.from(await remote.arrayBuffer()))
           if (want === got) ok('线上入口 JS 与交付包逐字节一致', `${member} sha=${got.slice(0, 16)}…`)

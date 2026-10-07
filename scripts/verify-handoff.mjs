@@ -32,12 +32,27 @@ const open = (m, extra) => {
   console.log(`  OPEN  ${m}${extra ? '  ' + extra : ''}`)
 }
 const shasum = (buf) => createHash('sha256').update(buf).digest('hex')
-// Git Bash 的 tar 会把 `E:\tmp\x.tar` 读成"远程主机 E:"，必须先转成 /e/tmp/x.tar。
-// node 自己的 fs 不受影响，所以只有传给子进程的路径要转。
-const forSh = (p) => p.replace(/\\/g, '/').replace(/^([A-Za-z]):\/+/, (_m, d) => '/' + d.toLowerCase() + '/')
-
+// 传给 tar 的路径形式取决于**实际被解析到的是哪个 tar**：Git Bash 的 MSYS tar 认 /e/tmp/x.tar，
+// 见到 `E:\tmp` 会当成"远程主机 E:"；而 System32 的 bsdtar 认 E:/tmp/x.tar，见到 /e/… 报 Cannot open。
+// 两台机器可能选到不同的 tar，所以不猜：各试一次 `tar -tf`，用能读通的那一种；两种都不行就明确失败，
+// 绝不因为"探针没跑起来"而把产物断言算成通过。
 const TAR = resolve(arg('tar', 'E:/tmp/dist-v8.12.0-r8.tar.gz'))
-const TAR_SH = forSh(TAR)
+const FORMS = [
+  (p) => p.replace(/\\/g, '/').replace(/^([A-Za-z]):\/+/, (_m, d) => '/' + d.toLowerCase() + '/'),
+  (p) => p.replace(/\\/g, '/'),
+]
+let TP = null
+for (const f of FORMS) {
+  try {
+    execFileSync('tar', ['-tf', f(TAR)], { stdio: 'ignore' })
+    TP = f
+    break
+  } catch { /* 换下一种路径形式 */ }
+}
+if (!TP) {
+  bad('两种路径形式都读不通这份包（tar 不在 PATH、包损坏或路径写错）——产物侧断言全部不可信', TAR)
+  TP = (p) => p // 让后面的调用照常进行，失败已经记上了，不会再冒充通过
+}
 
 const tarLines = (args) => {
   try {
@@ -61,7 +76,7 @@ else {
   else pass(`tar sha 与文档记录一致`, `${sha.slice(0, 16)}… 见于 ${inDocs.map((d) => d.split(/[\\/]/).pop()).join(',')}`)
 
   const need = ['dist/boot.js', 'dist/public/index.html']
-  const listing = tarLines(['-tzf', TAR_SH])
+  const listing = tarLines(['-tzf', TP(TAR)])
   if (listing) {
     for (const n of need) (listing.includes(n) ? pass : bad)(`tar 含 ${n}`, `${listing.length} 条目`)
     const br = listing.filter((p) => p.endsWith('.br')).length
@@ -85,7 +100,7 @@ else {
     try {
       rmSync(tmp, { recursive: true, force: true })
       mkdirSync(tmp, { recursive: true })
-      execFileSync('tar', ['-xzf', TAR_SH, '-C', forSh(tmp)], { maxBuffer: 64 * 1024 * 1024 })
+      execFileSync('tar', ['-xzf', TP(TAR), '-C', TP(tmp)], { maxBuffer: 64 * 1024 * 1024 })
       const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => {
         const f = join(d, e.name)
         return e.isDirectory() ? walk(f) : [f]
