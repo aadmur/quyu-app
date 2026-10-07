@@ -31,7 +31,7 @@ const present = fs.readdirSync(dir).filter((f) => f.endsWith(".woff2"));
 for (const [file, purpose] of Object.entries(EXPECTED)) {
   if (!present.includes(file)) {
     failures += 1;
-    console.log(`FAIL  ${file}  缺失（${purpose}）`);
+    console.error(`FAIL  ${file}  缺失（${purpose}）`);
   }
 }
 
@@ -45,7 +45,7 @@ for (const file of present) {
   const magic = buf.subarray(0, 4).toString("ascii");
   if (magic !== "wOF2") {
     failures += 1;
-    console.log(`FAIL  ${file}  magic=${magic}，不是 woff2`);
+    console.error(`FAIL  ${file}  magic=${magic}，不是 woff2`);
     continue;
   }
 
@@ -66,7 +66,7 @@ for (const file of present) {
     .filter(Boolean);
   if (flags.length) {
     failures += 1;
-    console.log(`FAIL  ${file}  ${sizeKb.toFixed(1)} KB  ${flags.join("；")}`);
+    console.error(`FAIL  ${file}  ${sizeKb.toFixed(1)} KB  ${flags.join("；")}`);
   } else {
     console.log(
       `PASS  ${file}  ${sizeKb.toFixed(1)} KB  woff2 合法 / 表数 ${numTables} / 未压缩 ${(totalSfntSize / 1024).toFixed(1)} KB`,
