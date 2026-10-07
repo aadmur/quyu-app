@@ -100,6 +100,10 @@ for (const [path, input, label] of probes) {
   // 404/NOT_FOUND 才是"端点不存在"；500 多为迁移未跑（见第 3 项的判读）
   if (r.status === 404 || /"path":"${path}[^"]*"[^}]*"status":404/.test(text)) {
     bad(`${label}：端点不存在（部署的代码不是 v14？）`, `http=${r.status}`)
+  } else if (r.status >= 500) {
+    // 只判"在不在"会放过一种真实故障：SQL 语法/函数在生产引擎上不被支持（v14 首次引入 JSON_EXTRACT 等）。
+    // 那类错误到执行期才炸，端点照样"在位"，所以 5xx 必须算失败并把原文带出来。
+    bad(`${label}：端点在位但服务端 5xx（SQL 层问题：迁移未跑 / 函数或语法不被支持 / 库不可达）`, text.slice(0, 160))
   } else {
     ok(`${label}：端点在位`, `http=${r.status}`)
   }
