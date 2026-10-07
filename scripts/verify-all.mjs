@@ -34,6 +34,7 @@ const SUITE = [
   { name: '知识库规则', cmd: 'node', args: ['--import', 'tsx', 'scripts/check-knowledge.ts'], needs: 'static' },
   { name: '动画能力边界', cmd: 'node', args: ['scripts/check-motion-boundary.mjs'], needs: 'static' },
   { name: '计划条目可追溯性', cmd: 'node', args: ['scripts/check-plan-coverage.mjs', '--strict'], needs: 'static' },
+  { name: '文档指针有效性', cmd: 'node', args: ['scripts/check-doc-pointers.mjs'], needs: 'static' },
   { name: '直跑版迁移静态核对', cmd: 'node', args: ['scripts/check-run-sql.mjs'], needs: 'static' },
   { name: '真实库冒烟（smoke.ts）', cmd: 'node', args: ['--env-file=.env.smoke', '--import', 'tsx', 'scripts/smoke.ts'], needs: 'db' },
   { name: '图片发布链路冒烟', cmd: 'node', args: ['--env-file=.env.smoke', '--import', 'tsx', 'scripts/smoke-images.ts'], needs: 'db' },

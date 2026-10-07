@@ -19,6 +19,7 @@
     "verify:deploy": "node scripts/verify-deploy.mjs",
     "verify:handoff": "node scripts/verify-handoff.mjs",
     "check:sql": "node scripts/check-run-sql.mjs",
+    "check:docs": "node scripts/check-doc-pointers.mjs",
     "verify:rollback": "bash scripts/v14-rollback-drill.sh",
     "verify": "node scripts/verify-all.mjs",
     "format": "prettier --write .",
