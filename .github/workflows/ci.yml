@@ -1,0 +1,91 @@
+name: ci
+
+# 为什么这份文件必须在仓库里（app/.github/），而不是放在项目根目录的 .github/：
+# `git rev-parse --show-toplevel` = .../app，而根目录那一份在 git 之外
+# （`git ls-files ../.github` 直接报 "outside repository"）。GitHub 只认**被推送那棵树的根**
+# 里的 .github/workflows，所以照原位置它永远不会触发——v8.6.1 起文档里写的"迁移 CI 化"
+# 因此从未真的跑过（本机 `git branch -r` 为空，也没有任何远程跟踪引用可以反证）。
+# 远程 quyu-app 的真实布局未能证实（github.com 连不上），若它是"根目录 + app 子目录"那一型，
+# 则需要把本文件移到那个根、并把下面两处路径改回 app/。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      # build 脚本里没有 tsc，类型检查必须单独一步（历史上多次"构建绿但类型红"）
+      - run: node node_modules/typescript/bin/tsc -b
+      # build 内含 vitest run 与 check-plan-coverage --strict。后者在本仓库里读不到
+      # ../docs/产品/迭代计划-v14-草案.md（根 docs 不入库），会降级为"以证据索引声明的
+      # 条目全集为准 + 警告"并 exit 0——这是设计如此，不是假绿：锚点仍然逐条核验。
+      - run: npm run build
+
+  migrate-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: quyu_test
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - name: 在测试库执行全部迁移（drizzle 版）
+        env:
+          DATABASE_URL: mysql://root:root@127.0.0.1:3306/quyu_test
+        run: npm run db:migrate
+      - name: 校验关键表结构已落齐
+        run: |
+          sudo mysql -h 127.0.0.1 -uroot -proot quyu_test -e "
+            SHOW COLUMNS FROM posts LIKE 'location_text';
+            SHOW COLUMNS FROM users LIKE 'bio';
+            SHOW COLUMNS FROM ponds LIKE 'claim_code';
+            SHOW TABLES LIKE 'pond_admins';
+            SHOW TABLES LIKE 'post_favorites';
+            SHOW COLUMNS FROM comments LIKE 'like_count';
+            SHOW COLUMNS FROM reports LIKE 'comment_id';"
+
+      # 生产直跑版（*_run.sql）才是上线那一刻真正执行的东西，原先 CI 完全没碰过它。
+      # ⚠️ 说清这一步**不能**发现什么：库是先 db:migrate 建好的，所以每条 ALTER 的
+      # information_schema 守卫都会走 skip 分支——它能验的是字面量/守卫查询/回填 UPDATE
+      # 的语法与幂等，**验不到 ALTER 分支本身**。要覆盖那条得另建一个"只到 0012 的库"，
+      # 那需要跨版本 checkout，本轮没做。
+      - name: 生产直跑版迁移再跑两遍（语法 + 幂等 + 无 ERROR）
+        run: |
+          set -euo pipefail
+          for pass in 1 2; do
+            for f in db/migrations/*_run.sql; do
+              out=$(sudo mysql -h 127.0.0.1 -uroot -proot --comments quyu_test < "$f" 2>&1) || {
+                echo "第 $pass 遍执行 $f 失败："; echo "$out"; exit 1; }
+              if printf '%s' "$out" | grep -qiE "^ERROR|ERROR [0-9]"; then
+                echo "第 $pass 遍 $f 输出里有 ERROR："; echo "$out"; exit 1; fi
+              echo "pass=$pass file=$f ok"
+            done
+          done

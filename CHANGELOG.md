@@ -587,6 +587,33 @@ CSS 6.44 KB br、按需 `PostContent` 11.96 KB br（仍顶在 12KB 线上、零�
   `verify:rollback` **没有**接进 `npm run verify`——它会起真实服务、耗时约 25 秒，属于 `--db/--server` 那一层，
   塞进静态门禁会让人更不愿意跑全套。
 
+### 十八、查证"迁移 CI 化"这句话时，发现那条 CI 从来跑不起来
+
+起因很朴素：交接文档说"CI 会在 MySQL 8 测试库全量跑 db/migrations 全部迁移"，我想确认 v14 的 0013/0014 是否真被 CI 覆盖。结果：
+
+- 仓库根是 `app/`（`git rev-parse --show-toplevel`），而 workflow 文件在**上一级**的
+  `E:\趣渔项目APP开发\.github\workflows\ci.yml`——那目录不在 git 里（`git ls-files ../.github` 直接报
+  `outside repository`）。GitHub 只认**被推送那棵树根下**的 `.github/workflows`，所以照现在的位置它永远不会触发。
+  旁证：`git branch -r` 为空（没有任何远程跟踪引用），且那份 workflow 里写着 `working-directory: app`
+  与 `cache-dependency-path: app/package-lock.json`——它是按"仓库根 = 项目根目录"的假设写的，
+  与本机实际的 git 根不一致。**结论：v8.6.1 起文档里的"迁移 CI 化"是一句从未生效的保证**，
+  和这个会话里反复出现的"没被任何入口引用的测试等于没有测试"是同一件事，只是这次规模更大。
+  （远程 `quyu-app` 的真实布局无法证实：`git ls-remote` 连不上 github.com。所以两种修法都写进文件头注释了。）
+- 修法：新增**仓库内**的 `.github/workflows/ci.yml`（`working-directory: .`、锁文件路径 `package-lock.json`），
+  并补上原来缺的两块覆盖：① 结构核对加了 v14 的 `post_favorites` / `comments.like_count` / `reports.comment_id`
+  （原先只核对 v13 的列）；② 新加一步**跑生产直跑版 `db/migrations/*_run.sql` 两遍**——那才是上线那一刻
+  真正执行的 SQL，旧 CI 完全没碰过它。
+- 说清这一步**不能**发现什么（否则就是又一次自我刷绿）：测试库是先用 drizzle 迁移建好的，
+  所以每条 ALTER 的 `information_schema` 守卫都会走 **skip 分支**；该步能验的是守卫查询、字面量、
+  回填 UPDATE 的语法与幂等，**验不到 ALTER 分支本身**。要覆盖那条得另建一个"只迁到 0012 的库"，
+  需要跨版本 checkout，本轮没做，也没有假装做了。
+- 新 CI 步骤本身做了差分测试（把步骤文本里的 `sudo mysql` 换成可控桩，循环与判据一字不改）：
+  正常输出 → 退出 0；命令失败（`ERROR 1064` + exit 1）→ 退出 1 并打印是哪一遍哪个文件；
+  **退出 0 但输出含 `ERROR`**（真实 mysql 客户端在某些错误下就是这种形状）→ 也退出 1。
+  三种结局都能变红，YAML 也用 js-yaml 解析过、结构核对断言里三个 v14 新字段都在。
+- ⚠️ 但**现在仍然没有 CI**：文件只是躺在分支里，要等用户授权 push 才会第一次执行。
+  所以我没有把任何文档措辞改成"CI 已覆盖"，只写"已就位、待首次推送验证"。
+
 ## [v8.11.0] - 2026-10-04 「哪钓专业化」（迭代计划 v13，C1~C7 全量）
 
 > 状态：**已于 2026-10-04 17:31 (CST) 上线生产**（本地/库级验收 48+56 项全通过后热更新；见下方「部署记录」）。
