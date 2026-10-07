@@ -117,7 +117,8 @@ for (const f of runFiles) {
     // 变异测试里我把重建改名成 uq_report_new，判据仍然报绿，就是这个漏洞被实抓了一次。
     const readded = new RegExp(`(ADD CONSTRAINT|ADD (?:UNIQUE )?INDEX)\\s+\`?${name}\`?(?![A-Za-z0-9_])`, 'i').test(sql)
     if (!readded) bad(`${f} DROP INDEX \`${d[1]}\` 之后没有同名重建——索引真的消失了`)
-    else console.log(`WARN  ${f} 替换了索引 \`${d[1]}\`：唯一/查询语义随之变化，"回滚代码不动库"这句话对这条例外`)
+    else console.log(`WARN  ${f} 替换了索引 \`${d[1]}\`（唯一性列集变了）。注意这只影响**新代码**的前向语义：`
+      + '老代码不传那一列时会落默认值 0，去重行为对它自己保持不变——要下判断得读写入路径，别只看 DDL。')
   }
   if (verbose) console.log(`  ${f}: 表 ${refs.length} 建 ${created.length} 加列 ${adds.length}，已知表基数 ${known.size}`)
 }
