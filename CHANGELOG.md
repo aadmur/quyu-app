@@ -466,6 +466,20 @@ CSS 6.44 KB br、按需 `PostContent` 11.96 KB br（仍顶在 12KB 线上、零�
   **B-29**（`scripts/smoke.ts` 第 2 节在要求座位的库上必崩，导致其后各节永不执行）、
   **B-30**（`PostContent` 的 `view` 每轮新建，使下游 `useMemo` 形同虚设）。backlog 现为 B-01…B-30 连续无缺号。
 
+### 十四、修好一套"从来没能跑完"的冒烟套件（B-29）
+
+- 症状：`scripts/smoke.ts` 在第 2 节抛「钓位数量必须与购票数量一致」后 `main()` 退出，**§3–§7 一次都没执行过**。
+- 诊断比原先登记的更硬：`createOrder` 是**无条件**要求 `seatNos.length === quantity`（1 票 1 位），
+  而 §2 传的是 `seatNos: []` 配 `quantity: 2` → 在**任何**库上都必抛。也就是说这不是"生产形状的数据才会踩"，
+  而是这条冒烟与交易 API 早就脱节了；而 **`smoke.ts` 没有挂在任何 npm 脚本上**，所以腐烂一直没人发现。
+  推论值得记住：**没被任何入口引用的测试等于没有测试**，它会安静地烂掉。
+- 修法：§2 从 `seats` 表取真实钓位、`visitDate` 用远期日期避开按 `(pondId, visitDate, seatNo)` 实时算出的占用；
+  新增 `npm run verify:smoke` 给它一个入口。
+- 我自己第一版把"清掉本次订单"放在了 §2 末尾，于是 §3 的核销读不到 `verify_code` ——
+  清场必须挪到**核销之后**（座位占用由订单实时计算，不删下次会撞 CONFLICT）。
+- 隔离库实跑：连续两次 `SMOKE PASSED`，7 节全部执行（recommendFeed / createOrder 幂等+金额重算 /
+  verifyOrder CAS / toggleLike 去重 / 埋点异步入库 / ownerStats+shop+pondDetail / keyword 搜索）。
+
 ### 十三、把「计划完成」从自评变成可核验（B-31 交付）
 
 - 新建 `docs/产品/v14-证据索引.md`：31 条计划项逐条绑到**真实存在的实现锚点**（文件 + 符号）与验证方式。

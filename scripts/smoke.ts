@@ -14,7 +14,7 @@
  */
 import assert from "node:assert";
 import { eq, sql } from "drizzle-orm";
-import { orders, ticketTypes } from "../db/schema";
+import { orders, seats, ticketTypes } from "../db/schema";
 import { getDataSource, getQueue } from "../api/infra";
 import { recommendFeed, trackEvent } from "../api/services/recommendService";
 import { createOrder, verifyOrder, myOrders } from "../api/services/trade";
@@ -41,12 +41,22 @@ async function main() {
   const [ticket] = await db.select().from(ticketTypes).where(eq(ticketTypes.pondId, 1)).limit(1);
   assert(ticket, "存在票种");
   const qty = 2;
+  /**
+   * seatNos 必须与 quantity 等长——`createOrder` 是**无条件**校验的（1 票 1 位），
+   * 而上一版这里传 `seatNos: []` 配 qty=2，于是第 2 节必抛「钓位数量必须与购票数量一致」，
+   * `main()` 当场退出，**§3–§7 从来没被执行过**（smoke 也没挂在任何 npm 脚本上，所以没人发现）。
+   * 取该塘真实钓位；visitDate 用远期日期，避开按 (pondId, visitDate, seatNo) 实时计算的占用。
+   */
+  const visitDate = "2030-01-05";
+  const seatRows = await db.select({ seatNo: seats.seatNo }).from(seats).where(eq(seats.pondId, 1)).limit(qty);
+  assert(seatRows.length === qty, `该钓场需有至少 ${qty} 个钓位（先跑 db/seed.ts 生成座位）`);
+  const seatNos = seatRows.map((r) => Number(r.seatNo));
   const o1 = await createOrder(SMOKE_USER, {
     pondSlug: "qinglong",
     ticketTypeId: ticket.id,
-    visitDate: "2026-09-05",
+    visitDate,
     quantity: qty,
-    seatNos: [],
+    seatNos,
     totalAmount: 1, // 故意传错，验证服务端重算
     idempotencyKey: idem,
   });
@@ -54,16 +64,17 @@ async function main() {
   const o2 = await createOrder(SMOKE_USER, {
     pondSlug: "qinglong",
     ticketTypeId: ticket.id,
-    visitDate: "2026-09-05",
+    visitDate,
     quantity: qty,
-    seatNos: [],
+    seatNos,
     totalAmount: 1,
     idempotencyKey: idem,
   });
   assert.strictEqual(o2.orderId, o1.orderId, "幂等键重复提交返回原单");
   const [created] = await db.select().from(orders).where(eq(orders.id, o1.orderId)).limit(1);
   assert.strictEqual(created.totalAmount, ticket.price * qty, "金额按服务端 price×quantity 重算");
-  console.log(`[ok] createOrder 幂等 + 金额重算: orderId=${o1.orderId}, amount=${created.totalAmount}`);
+  const smokeOrderId = o1.orderId
+  console.log(`[ok] createOrder 幂等 + 金额重算: orderId=${o1.orderId}, amount=${created.totalAmount}, seats=${seatNos.join("/")}`);
 
   // ---- 3. 核销 CAS（二次核销幂等失败） ----
   const v1 = await verifyOrder(created.verifyCode);
@@ -111,6 +122,10 @@ async function main() {
   );
   console.log(`[ok] listPonds keyword=青: ${kw.length} hits`);
 
+  // 清场：冒烟自己下的单要收掉。座位占用是按 (pondId, visitDate, seatNo) 从订单实时算的，
+  // 留着它下次再跑同一 visitDate 就会被判「钓位已被预订」——但必须放在 §3 之后，
+  // 因为核销那节要读这单的 verify_code。
+  await db.delete(orders).where(eq(orders.id, smokeOrderId));
   getQueue().stop();
   console.log("\nSMOKE PASSED");
   process.exit(0);

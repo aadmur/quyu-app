@@ -15,6 +15,7 @@
     "verify:fishspot": "node --env-file=.env.smoke --import tsx scripts/verify-fishspot.ts",
     "verify:images": "node --env-file=.env.smoke --import tsx scripts/smoke-images.ts",
     "verify:static": "node --env-file=.env.smoke scripts/smoke-static.mjs",
+    "verify:smoke": "node --env-file=.env.smoke --import tsx scripts/smoke.ts",
     "format": "prettier --write .",
     "test": "vitest run",
     "perf:firstload": "node scripts/measure-firstload.mjs",
