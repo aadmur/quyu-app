@@ -10,8 +10,8 @@
  */
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -76,21 +76,40 @@ else {
       : bad('包里居然含 package.json 或 scripts/ —— "改文档不影响产物"的推断不再成立', shipped.join(','))
   }
 
-  // 包内 boot.js 与本机现构建的 boot.js 必须一致，否则"产物对得上源码"这句话没人核过
-  const localBoot = join(root, 'dist/boot.js')
-  if (!existsSync(localBoot)) open('本机没有 dist/boot.js，无法比对包内入口（先跑 npm run build）')
+  // 整棵 dist 与交付包逐文件比对。为什么不止比 boot.js：入口一致只能证明后端壳子对得上，
+  // 前端是内容哈希分块，少传/多传/传错某一块都可能让线上跑到旧 chunk 而首页看起来正常。
+  const localDist = join(root, 'dist')
+  if (!existsSync(localDist)) open('本机没有 dist/，无法做整树比对（先跑 npm run build）')
   else {
-    let inTar = null
+    const tmp = join(root, '.handoff-tmp')
     try {
-      inTar = execFileSync('tar', ['-xzOf', TAR_SH, 'dist/boot.js'], { maxBuffer: 64 * 1024 * 1024 })
+      rmSync(tmp, { recursive: true, force: true })
+      mkdirSync(tmp, { recursive: true })
+      execFileSync('tar', ['-xzf', TAR_SH, '-C', forSh(tmp)], { maxBuffer: 64 * 1024 * 1024 })
+      const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => {
+        const f = join(d, e.name)
+        return e.isDirectory() ? walk(f) : [f]
+      })
+      const tree = (base) => new Map(walk(base).map((f) => [
+        relative(base, f).split(sep).join('/'),
+        shasum(readFileSync(f)),
+      ]))
+      const A = tree(localDist)
+      const B = tree(join(tmp, 'dist'))
+      const onlyLocal = [...A.keys()].filter((k) => !B.has(k))
+      const onlyTar = [...B.keys()].filter((k) => !A.has(k))
+      const mismatch = [...A.keys()].filter((k) => B.has(k) && A.get(k) !== B.get(k))
+      const n = onlyLocal.length + onlyTar.length + mismatch.length
+      if (n === 0) pass(`交付包与本机构建逐文件一致（${A.size} 个文件，含 boot.js 与全部分块）`,
+        `boot.js=${(A.get('boot.js') ?? '').slice(0, 16)}…`)
+      else {
+        bad(`整树比对有 ${n} 处不同：仅本机 ${onlyLocal.length}、仅包内 ${onlyTar.length}、同名不同内容 ${mismatch.length}`)
+        for (const l of [...onlyLocal, ...onlyTar, ...mismatch].slice(0, 6)) console.log(`        ${l}`)
+      }
+      rmSync(tmp, { recursive: true, force: true })
     } catch (e) {
-      bad('取不到包内 dist/boot.js，无法比对', String(e.stderr || e.message).split(/\r?\n/)[0])
-    }
-    if (inTar) {
-      const a = shasum(inTar)
-      const b = shasum(readFileSync(localBoot))
-      a === b ? pass(`包内 dist/boot.js == 本机构建产物`, a.slice(0, 16) + '…')
-        : bad('包里的 boot.js 与本机 dist 不一致：产物没跟上最近一次构建', `tar=${a.slice(0, 12)} local=${b.slice(0, 12)}`)
+      bad('整树比对没做成（解包或读取失败）', String(e.stderr || e.message).split(/\r?\n/)[0])
+      rmSync(tmp, { recursive: true, force: true }) // 失败也要收尾，否则仓库里留一个 2.6MB 的垃圾目录
     }
   }
 }
