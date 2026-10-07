@@ -81,6 +81,11 @@ else {
     for (const n of need) (listing.includes(n) ? pass : bad)(`tar 含 ${n}`, `${listing.length} 条目`)
     const br = listing.filter((p) => p.endsWith('.br')).length
     br >= 30 ? pass(`tar 内 .br = ${br}（闸门 ≥30）`) : bad(`tar 内 .br 只有 ${br}，部署后首屏会退化为未压缩`)
+    // 服务器以 root 解包，所以条目路径必须都落在 dist/ 之下：绝对路径或 .. 会让 tar 写到目录之外。
+    const escape = listing.filter((p) => p.startsWith('/') || p.includes('..') || !p.startsWith('dist/'))
+    escape.length === 0
+      ? pass('所有条目都在 dist/ 之下（无绝对路径、无 .. 穿越）')
+      : bad(`${escape.length} 个条目会解到 dist/ 之外，root 解包时被污染的路径见下`, escape.slice(0, 3).join(', '))
     const back = listing.filter((p) => p.includes('\\')).length
     back === 0 ? pass('无 Windows 反斜杠路径') : bad(`${back} 个条目带反斜杠，Linux 解包会得到错误文件名`)
     const dbg = listing.filter((p) => p.includes('data-dbg')).length
@@ -121,6 +126,35 @@ else {
         bad(`整树比对有 ${n} 处不同：仅本机 ${onlyLocal.length}、仅包内 ${onlyTar.length}、同名不同内容 ${mismatch.length}`)
         for (const l of [...onlyLocal, ...onlyTar, ...mismatch].slice(0, 6)) console.log(`        ${l}`)
       }
+      // 内容安全检查：这份包要原样上传到一台公网服务器，所以先确认里面没有凭据痕迹、
+      // 没有源码映射。命中只报**文件名与规则名**，绝不把命中的内容本身打到屏幕上。
+      const RULES = [
+        ['阿里云 AccessKeyId 形态', /LTAI[A-Za-z0-9]{12,24}/],
+        ['私钥块', /-----BEGIN [A-Z ]{0,20}PRIVATE KEY-----/],
+        ['带口令的数据库连接串', /mysql:\/\/[^\s"'`)]{1,64}:[^\s"'`@)]{3,64}@/],
+        ['写死的 APP_SECRET 值', /APP_SECRET["']?\s*[:=]\s*["']?[A-Za-z0-9_\-]{8,}/],
+      ]
+      // 用"排除二进制"而不是"只挑几种文本"：白名单会把 `.env` 这种无扩展名又最可能藏凭据的文件放过
+      // （我第一版就是这样，毒包里那份 .env 根本没进扫描——这条如果不测就是一次安静的假绿）。
+      const BINARY = /\.(png|jpe?g|webp|gif|ico|avif|svgz|woff2?|ttf|otf|eot|mp4|webm|br|gz)$/
+      const hits = []
+      let maps = 0
+      let scanned = 0
+      for (const rel of B.keys()) {
+        if (rel.endsWith('.map')) maps++
+        if (BINARY.test(rel)) continue
+        const buf = readFileSync(join(tmp, 'dist', rel))
+        if (buf.length > 12 * 1024 * 1024) continue
+        scanned++
+        const text = buf.toString('latin1') // 只找 ASCII 特征，不必真的解码非 UTF-8 内容
+        for (const [rule, re] of RULES) if (re.test(text)) hits.push(`${rel} ← ${rule}`)
+      }
+      maps === 0
+        ? pass('包内没有 .map 源码映射（构建产物一旦带上就等于把源码上传到公网）')
+        : bad(`包内有 ${maps} 个 .map 文件，会暴露源码结构`, [...B.keys()].filter((k) => k.endsWith('.map')).slice(0, 3).join(', '))
+      hits.length === 0
+        ? pass(`${scanned} 个文本类文件正文里没有凭据特征`, `规则 ${RULES.length} 条，跳过二进制 ${B.size - scanned}`)
+        : bad(`包内疑似有凭据/秘密，先别上传`, hits.slice(0, 6).join(' | '))
       rmSync(tmp, { recursive: true, force: true })
     } catch (e) {
       bad('整树比对没做成（解包或读取失败）', String(e.stderr || e.message).split(/\r?\n/)[0])
