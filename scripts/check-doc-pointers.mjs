@@ -116,7 +116,9 @@ if (checked === 0) {
 } else {
   console.log(`解析到 ${checked} 处可机械核对的文档指针，覆盖 ${present.map(([n]) => n).join(', ')}`)
   // 豁免必须打印出来：看不见名单，就等于有人往名单里塞真失效也不被发现。
-  for (const [rel, why] of exempt) console.log(`EXEMPT ${rel} ← ${HISTORICAL.get(rel) ?? '未注明来由（不该存在）'}${why ? '' : ''}`)
+  // （对 Set<string> 用 `[rel, why]` 解构会逐字符拆开，第一次就打印成 "s"——自己刚立的
+  // "少解析=少检查要报红"，轮到我自己先把打印内容核对过再说。）
+  for (const rel of exempt) console.log(`EXEMPT ${rel} ← ${HISTORICAL.get(rel) ?? '未注明来由（不该存在）'}`)
   if (uniq.length === 0) console.log('DOC POINTERS OK：全部指得中')
   else {
     for (const d of uniq) console.log(`FAIL  ${d}`)
