@@ -8,9 +8,12 @@
  * 以及最容易出事的一环——**迁移没跑就切了代码**（会表现为特定接口 500，而不是白屏）。
  *
  * 用法：
- *   node scripts/verify-deploy.mjs --base http://120.x.x.x:3000 [--cookie 'session=...']
+ *   node scripts/verify-deploy.mjs --base http://120.x.x.x:3000 [--cookie 'session=...'] [--tar E:/tmp/dist-v8.12.0-r8.tar.gz]
  *   本地自测：node scripts/verify-deploy.mjs --base http://127.0.0.1:3100
  *
+ * --tar 会把"服务器正在跑的入口 JS"与"本机交付包里那份"做字节级比对——
+ * 这是本项目里唯一能直接回答"线上到底是这份 8.12.0 吗"的检查：
+ * package.json 的 version 一直是 0.0.0，服务端也没有任何版本端点，版本号只活在文件名与 CHANGELOG 里。
  * 退出码：0 = 全通过；1 = 有失败项（每项都打印是什么、说明它意味着什么）。
  * 刻意不做的事：不写库、不下单、不发评论——线上跑这个脚本应当是只读的。
  */
@@ -21,9 +24,21 @@ const getArg = (name) => {
 }
 const base = (getArg('--base') ?? 'http://127.0.0.1:3000').replace(/\/$/, '')
 const cookie = getArg('--cookie')
+const tarPath = getArg('--tar')
+
+import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+const shasum = (b) => createHash('sha256').update(b).digest('hex')
+// Git Bash 的 tar 会把 E:\tmp\x.tar 读成"远程主机 E:"，传给孩子进程前先转 /e/tmp/x.tar
+const forSh = (p) => p.replace(/\\/g, '/').replace(/^([A-Za-z]):\/+/, (_m, d) => '/' + d.toLowerCase() + '/')
 
 let failed = 0
+let skipped = 0
 const ok = (msg, extra = '') => console.log(`PASS  ${msg}${extra ? '  ' + extra : ''}`)
+const skip = (msg, extra = '') => {
+  skipped += 1
+  console.log(`SKIP  ${msg}${extra ? '  ' + extra : ''}`)
+}
 const bad = (msg, extra = '') => {
   failed += 1
   console.error(`FAIL  ${msg}${extra ? '  ' + extra : ''}`)
@@ -77,6 +92,30 @@ const safeFetch = async (url, opts) => {
     const a = await safeFetch(`${base}${m[0]}`, { headers: headers({ 'Accept-Encoding': 'br' }) })
     if (!a.ok) bad('入口 JS 取不到（改名/漏传导致的 404 会在这里暴露）', `${m[0]} http=${a.status} ${a.err ?? ''}`)
     else ok('入口 JS 可达', `${m[0]} http=${a.status} enc=${a.headers.get('content-encoding') ?? 'identity'}`)
+    // 字节级绑定：服务器给回的这份入口 JS 必须与本机交付包里同名的那份逐字节相同。
+    // 为什么值得多做这一步：版本字符串根本不存在于产物里（package.json=0.0.0，无版本端点），
+    // "线上是这份 8.12.0 吗"只能靠内容自证；端点存在只能说明"是 v14 那一类代码"，
+    // 不能排除"传错包/传了一半/后来又被覆盖"。
+    if (a.ok) {
+      if (!tarPath) skip('没给 --tar，跳过"线上入口 JS == 本机交付包"的字节比对')
+      else {
+        try {
+          // URL 里的 /assets/… 在包内是 dist/public/assets/…——直接拿 URL 当包内成员名会取不到，
+          // 而"取不到"长得非常像"比对失败"，这条区分必须做对（第一版就踩了）。
+          const member = 'dist/public' + m[0]
+          const want = shasum(execFileSync('tar', ['-xzOf', forSh(tarPath), member], { maxBuffer: 64 * 1024 * 1024 }))
+          const remote = await fetch(`${base}${m[0]}`, { headers: headers({ 'Accept-Encoding': 'br' }) })
+          const got = shasum(Buffer.from(await remote.arrayBuffer()))
+          if (want === got) ok('线上入口 JS 与交付包逐字节一致', `${member} sha=${got.slice(0, 16)}…`)
+          else bad('线上入口 JS 与交付包不一致：传错包、漏文件，或部署后又被改过', `tar=${want.slice(0, 16)}… 服务器=${got.slice(0, 16)}…`)
+        } catch (e) {
+          // 资源名是内容哈希，"包内找不到线上那份"几乎总意味着包不对（传错版本/只传了一半），
+          // 这比"字节不同"更常见，所以把这条结论直接写出来，别让人去猜 tar 的错误。
+          bad('字节比对没做成：交付包里找不到线上那份入口 JS（多半就是线上跑的不是这份交付包）',
+            String(e.message ?? e).slice(0, 110))
+        }
+      }
+    }
   }
   }
 }
@@ -139,7 +178,11 @@ for (const [path, input, label] of [['app.posts.comments', { postId: 1, limit: 5
   }
 }
 
-console.log(failed === 0 ? '\nDEPLOY VERIFY PASSED' : `\nDEPLOY VERIFY FAILED：${failed} 项`)
+console.log(
+  failed === 0
+    ? `\nDEPLOY VERIFY PASSED${skipped ? `（另有 ${skipped} 项因缺参数跳过，不算通过）` : ''}`
+    : `\nDEPLOY VERIFY FAILED：${failed} 项${skipped ? `，另有 ${skipped} 项跳过` : ''}`
+)
 /**
  * 只设 process.exitCode，不调 process.exit()。
  * 上一版在这里强退：Windows 下 fetch 的 keep-alive socket 还在关闭流程中被打断，

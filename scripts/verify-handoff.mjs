@@ -34,7 +34,7 @@ const open = (m, extra) => {
 const shasum = (buf) => createHash('sha256').update(buf).digest('hex')
 // Git Bash 的 tar 会把 `E:\tmp\x.tar` 读成"远程主机 E:"，必须先转成 /e/tmp/x.tar。
 // node 自己的 fs 不受影响，所以只有传给子进程的路径要转。
-const forSh = (p) => p.replace(/\\/g, '/').replace(/^([A-Za-z]):/, (_m, d) => '/' + d.toLowerCase() + '/')
+const forSh = (p) => p.replace(/\\/g, '/').replace(/^([A-Za-z]):\/+/, (_m, d) => '/' + d.toLowerCase() + '/')
 
 const TAR = resolve(arg('tar', 'E:/tmp/dist-v8.12.0-r8.tar.gz'))
 const TAR_SH = forSh(TAR)
