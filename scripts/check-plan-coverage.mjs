@@ -99,7 +99,7 @@ if (indexText) {
             .filter(Boolean),
         }
       })
-      .filter((c) => /\.(ts|tsx|mjs)$/.test(c.file))
+      .filter((c) => /\.(ts|tsx|mjs|sql)$/.test(c.file))
     if (cites.length === 0) continue
     let allGood = true
     let symbolsChecked = 0
