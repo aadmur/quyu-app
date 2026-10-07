@@ -16,6 +16,7 @@
     "verify:images": "node --env-file=.env.smoke --import tsx scripts/smoke-images.ts",
     "verify:static": "node --env-file=.env.smoke scripts/smoke-static.mjs",
     "verify:smoke": "node --env-file=.env.smoke --import tsx scripts/smoke.ts",
+    "verify:deploy": "node scripts/verify-deploy.mjs",
     "format": "prettier --write .",
     "test": "vitest run",
     "perf:firstload": "node scripts/measure-firstload.mjs",

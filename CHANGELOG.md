@@ -504,6 +504,24 @@ CSS 6.44 KB br、按需 `PostContent` 11.96 KB br（仍顶在 12KB 线上、零�
   → SyntaxError；而当时我用 `| head` 后面的 `$?` 读退出码，读到的是 head 的状态，于是"崩了却显示 exit=0"。
   又一次印证同一件事：**测量方式错了，结论就毫无意义**（本轮第 5 次栽在这上面）。
 
+### 十五、上线后一键复核（`npm run verify:deploy`）
+
+- 动机：v14 还剩三条只有真机/浏览器能验的行为，而"部署完打开首页看一眼"既覆盖不到它们，
+  也覆盖不到最容易出事的一种失败——**迁移没跑就切了代码**（表现是特定接口 500，不是白屏）。
+  于是把服务端能验的部分压成一条只读命令：`node scripts/verify-deploy.mjs --base http://<ip>:3000`。
+- 检查项（本地 production 服务实测 **9 项全 PASS、exit 0**）：首页是构建后的文档、brotli 协商生效、
+  入口 JS 真的可取（改名/漏传这类历史 404）、v14 四个读端点在位（feed / detail / comments / myFavorites）、
+  评论接口无缺列缺表迹象（即迁移确实跑过）、`/uploads/*` 没被 SPA fallback 吞掉。
+- 反向也测了：基址不可达时输出 7 行可读 FAIL、exit 1，第一行直接告诉你"先 systemctl status quyu"。
+- 写这个脚本过程中被自己抓到三个错，都留在这里，因为都是"看起来能用其实会误导运维"的形态：
+  ① 断言首页含 `<div id="app">`——挂载点其实是 `#root`，**我猜的**；改成只认构建产物必有的标记
+    （`<script type="module">` + `/assets/index-…`），不再依赖实现细节。
+  ② 探针里用了 `app.posts.commentList`，真实 procedure 名是 `app.posts.comments`——
+    照它跑上线当天会报"部署的代码不是 v14"，是个纯假警报。名字是查 `feature-router.ts` 得到的。
+  ③ 结尾 `process.exit()` 在 Windows 上会在 socket 未摘除时打断 libuv：
+    **打印完 PASSED 却 exit=127**，连跑三次稳定复现。改成只设 `process.exitCode`；
+    对门禁来说，退出码说谎比没有门禁更糟，因为 CI 与脚本判断只看退出码。
+
 ## [v8.11.0] - 2026-10-04 「哪钓专业化」（迭代计划 v13，C1~C7 全量）
 
 > 状态：**已于 2026-10-04 17:31 (CST) 上线生产**（本地/库级验收 48+56 项全通过后热更新；见下方「部署记录」）。
