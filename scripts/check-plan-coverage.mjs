@@ -27,7 +27,7 @@ import path from 'node:path'
 
 const root = path.resolve(import.meta.dirname, '..')
 const PLAN = path.resolve(root, '../docs/产品/迭代计划-v14-草案.md')
-const INDEX = path.resolve(root, '../docs/产品/v14-证据索引.md')
+const INDEX = path.resolve(root, 'docs/verification/v14-证据索引.md')
 const CODE_DIRS = ['src', 'api', 'db', 'contracts', 'scripts']
 const NARRATIVE_FILES = ['CHANGELOG.md']
 const strict = process.argv.includes('--strict')
@@ -35,11 +35,20 @@ const strict = process.argv.includes('--strict')
 const read = (p) => (fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null)
 
 const planText = read(PLAN)
-if (!planText) {
-  console.error('找不到计划文档：' + PLAN)
-  process.exit(1)
+let ids
+if (planText) {
+  ids = [...new Set(planText.match(/QY-[A-Z]+-\d+/g) ?? [])].sort()
+} else {
+  // 计划文档在根 docs 下（未纳入 git）。别人 clone 下来只会有仓库内的索引：
+  // 这时降级为「以索引声明的条目全集为准」并明确警告，而不是直接让构建红掉。
+  const idxText = read(INDEX)
+  if (!idxText) {
+    console.error('计划与索引都读不到，无法核验追溯性')
+    process.exit(1)
+  }
+  ids = [...new Set(idxText.match(/QY-[A-Z]+-\d+/g) ?? [])].sort()
+  console.warn(`警告：未找到计划文档（根 docs/ 不在仓库里），本次以索引声明的 ${ids.length} 条为准`)
 }
-const ids = [...new Set(planText.match(/QY-[A-Z]+-\d+/g) ?? [])].sort()
 
 // ── 代码里直接出现该号的条目（最硬的锚点） ─────────────────────────
 function walk(dir, out) {
