@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/check-fonts.mjs && node scripts/check-images.mjs && node scripts/check-perf-wiring.mjs && node --import tsx scripts/check-knowledge.ts && vitest run && node scripts/check-plan-coverage.mjs --strict && vite build && node scripts/check-motion-boundary.mjs && node scripts/precompress.mjs && esbuild api/boot.ts --platform=node --bundle --format=esm --outdir=dist --banner:js=\"import { createRequire } from 'module';const require = createRequire(import.meta.url);\"",
+    "build": "node scripts/check-fonts.mjs && node scripts/check-images.mjs && node scripts/check-perf-wiring.mjs && node --import tsx scripts/check-knowledge.ts && vitest run && node scripts/check-plan-coverage.mjs --strict && node scripts/check-run-sql.mjs && vite build && node scripts/check-motion-boundary.mjs && node scripts/precompress.mjs && esbuild api/boot.ts --platform=node --bundle --format=esm --outdir=dist --banner:js=\"import { createRequire } from 'module';const require = createRequire(import.meta.url);\"",
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "NODE_ENV=production node dist/boot.js",
@@ -18,6 +18,7 @@
     "verify:smoke": "node --env-file=.env.smoke --import tsx scripts/smoke.ts",
     "verify:deploy": "node scripts/verify-deploy.mjs",
     "verify:handoff": "node scripts/verify-handoff.mjs",
+    "check:sql": "node scripts/check-run-sql.mjs",
     "verify:rollback": "bash scripts/v14-rollback-drill.sh",
     "verify": "node scripts/verify-all.mjs",
     "format": "prettier --write .",

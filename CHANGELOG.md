@@ -573,9 +573,16 @@ CSS 6.44 KB br、按需 `PostContent` 11.96 KB br（仍顶在 12KB 线上、零�
   三个变异各自只打中它该打中的那条，说明断言不是摆设。产物 r8 **不必重出**：整条 `build` 链重跑后
   `dist/boot.js` 的 sha256 前缀仍是 `7775cba9e3e0acc8…`，与 r8 包内那份逐字节相同
   （包里只有 `dist/`，`package.json` / `scripts/` 计数为 0），本轮新增的两个脚本不随包上线。
-- **"回滚码不动库"从叙述升级成有依据**：审 `0013/0014` 直跑版 DDL，v14 加的全是
+- **"回滚码不动库"——今天被自己的新门禁改窄了。** 原话是"v14 加的全是
   `ADD COLUMN … NOT NULL DEFAULT …`（只有 `deleted_at` 可空）与 `CREATE TABLE IF NOT EXISTS`，
-  没有任何 DROP / 改类型 / 填不变的语句 → 老代码不写这些列的 INSERT 仍会落默认值。
+  没有任何 DROP / 改类型 / 填不变的语句"。**这句超出我当时探针的覆盖面**：我 grep 的是
+  `ADD COLUMN|CREATE TABLE|NOT NULL|DEFAULT`，**从没查过 DROP 本身**，就下了"没有任何 DROP"。
+  新加的 `scripts/check-run-sql.mjs` 第一版就把它报红：`0014_v14_comment_report_run.sql` 里有
+  `ALTER TABLE reports DROP INDEX uq_report`，随后用同名重建三列唯一索引
+  （`reporter_id, post_id, comment_id`）。仍然成立的部分：加列全带默认值、新表都是 IF NOT EXISTS、
+  没有删表/删列/改类型——所以老代码不写新列的 INSERT 照样落默认值，回滚**不会崩**。
+  但索引语义变宽了：回滚后"同一用户对同一帖只能举报一次"变成"每个评论位各能举报一次"，
+  这是产品可见的差别，已登记 **B-35** 等 PO 拍板。教训写在这：**结论的边界必须等于探针的边界**。
   唯一按位置取数据的风险点是 `api/infra/search.ts:126` 的 `SELECT *`（ponds/posts/products），
   该文件与 8.11.0 基线逐字一致，且 v14 没给这三张表加列。
 - **顺手查出一个更值得记的事实**：核对"生产库到底是什么引擎"时发现各处口径互相打架（本仓环境表说的是**开发机**
@@ -688,6 +695,39 @@ CSS 6.44 KB br、按需 `PostContent` 11.96 KB br（仍顶在 12KB 线上、零�
   > ② 第一版按**扩展名白名单**挑文本文件（js/css/html/json/txt/map），于是最可能藏凭据的无扩展名
   > `.env` 压根没进扫描——毒包测试里它安静地"通过"了。改成"排除已知二进制"的黑名单，并把这条留成规则：
   > **扫描类判据用白名单，默认失败方式是漏检**，而漏检不会报红。
+
+### 二十、给"CI 验不到的那条 ALTER 分支"补一道静态门禁（并让它推翻我一轮的结论）
+
+B-34 说清了动态覆盖做不到（本机起不了 mysqld，策略拦截，我没绕行）。但 ALTER 出错的两类主要原因
+其实是**静态可判**的，所以加了 `scripts/check-run-sql.mjs`（已接进 `build`，也进了 `npm run verify`，
+单独跑是 `npm run check:sql`）：
+
+- ① 守卫/ALTER 指向的表必须在 0012 之前就已存在（同一文件里新建的表除外）；
+- ② `CREATE TABLE` 必须 `IF NOT EXISTS` 且不与既有表重名（幂等的前提）；
+- ③ 每条 `ADD COLUMN` 里 `NOT NULL` 必须带 `DEFAULT`——否则回滚到 8.11.0 后，老代码不写这列的 INSERT 会直接失败；
+- ④ 不许出现 `DROP TABLE/COLUMN`、`MODIFY/CHANGE COLUMN`、`TRUNCATE`、`DELETE FROM`；
+  `DROP INDEX` 允许，但**必须同名重建**，否则算真删除；同名重建也照样打 WARN，因为唯一性语义已经变了。
+- 判据自身的牙齿：解析到的 `ADD COLUMN` 条数必须等于字面量出现次数，**少解析=少检查一律判 FAIL**
+  （第一版就少解析了 1 条：`DEFAULT ''/avatar-1.png''` 这种**双写引号**的声明被 `[^']+` 截断，
+  那条列安静地没被看过——正好是本项目反复出现的"白名单式漏检"）。
+
+**它第一跑就推翻了我上一轮写下的结论**：我曾在 CHANGELOG 与交接文档里写"v14 的 DDL 没有任何 DROP、
+回滚代码语义完全不变"，而我 grep 的关键字里**根本没有 DROP**。实际 `0014_v14_comment_report_run.sql`
+会 `DROP INDEX uq_report` 再重建为 `(reporter_id, post_id, comment_id)`：不是删库级危险，但
+举报去重从"每人每帖一次"放宽成"每人每帖每评论一次"，回滚代码不会崩、行为却回不到 8.11.0。
+已改窄那条结论并把这一项挂成 **B-35** 等拍板。
+
+四条变异都实测能变红（用 `--dir` 指向改坏的副本目录）：守卫表名拼错 → 报"指向不存在的表"；
+去掉某列的 `DEFAULT` → 报"NOT NULL 却没有默认值"；把重建索引改名成 `uq_report_new` → 报
+"DROP INDEX 之后没有同名重建"；去掉 `IF NOT EXISTS` → 报幂等会被破。
+第三条最初**没报错**：`uq_report` 被当成 `uq_report_new` 的前缀匹配上了，补上标识符边界负向预查才红——
+又一次"变异测试比绿灯有用"。
+
+> 补一条实抓：接完门禁后我按老习惯单独跑了一次 `vite build` 验证链条，`verify:handoff` 立刻报
+> "整树比对有 88 处不同：仅包内 88"。不是包错了，是 **`vite build` 的 `emptyOutDir` 会把
+> `dist/public` 清掉，连带删了 `precompress.mjs` 产的 `.br/.gz`**——只跑 vite 不跑 precompress
+> 得到的就是"首屏会退化成未压缩"的残缺产物。这道门禁在我这次误操作上当场变红，
+> 说明它守的是真事；正确链条是 `vite build → check-motion-boundary → precompress → esbuild`。
 
 ## [v8.11.0] - 2026-10-04 「哪钓专业化」（迭代计划 v13，C1~C7 全量）
 
