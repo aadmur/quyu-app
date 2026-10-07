@@ -161,6 +161,10 @@ for (const [path, input, label] of probes) {
     // 那类错误到执行期才炸，端点照样"在位"，所以 5xx 必须算失败并把原文带出来。
     bad(`${label}：端点在位但服务端 5xx（SQL 层问题：迁移未跑 / 函数或语法不被支持 / 库不可达）`, text.slice(0, 160))
   } else {
+    // 注：这里不加"401 记 SKIP"的分支。实测这组探针**不带 cookie 也会进 resolver 跑 SQL**
+    // （服务器对访客走 demo 身份，user_id=1，库不可达时报的是 `Failed query: select … from user_profiles …`
+    // 而不是 401），所以那个分支永远不会命中；而且我没法给它做变异测试（起桩服务被策略拦），
+    // 未观测过的分支留在部署关键脚本里只是 speculative code——已回退。
     ok(`${label}：端点在位`, `http=${r.status}`)
   }
 }
