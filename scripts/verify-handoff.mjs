@@ -280,6 +280,11 @@ open('三条 UI 行为：举报弹层重开是否干净 / 关注乐观态是否�
 open('阿里云内容安全真实网关（QY-SAFE-003）+ fail-open 还是 fail-closed 的拍板')
 open('生产库真实引擎版本与小版本（本机连不上生产，TiDB 口径与 MySQL 8 在文档里仍有冲突）')
 open('迁移直跑版在生产那份库上的 ALTER 分支（CI 那步只会走 skip，见 B-34）')
+// v15 识鱼带来的新 OPEN：这几条不是"跑慢点就能过"，而是要 AK、要真机、要授权环境。
+open('识鱼准确率**没有可复核的证据**：评测集实测 315 张（不是 534），scripts/eval-fishid.ts 只打印不落盘，results.json 不存在（B-37）')
+open('识鱼入口无条件可见，但生产 .env 里没有 MOONSHOT_API_KEY → 一上线每人点进都拿 412；这是产品决定不是部署能解决的（B-43）')
+open('识鱼钱路的 SQL 守卫（>= price、< limit、GREATEST）与"每条断言都能变红"都没验：前者要真库、后者要能注入变异的授权环境（B-39、B-40）')
+open('verify:static 本轮只复验了 exit=0，仍未复验"它能变红"（B-44）')
 
 console.log(`\n结论：失败 ${fails} 项，OPEN（需人/需云）${opens} 项`)
 if (fails > 0) console.log('交接物本身有问题——先修这些再上线，别让部署那一刻成为第一次核对。')

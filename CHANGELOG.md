@@ -60,6 +60,8 @@
 | 部署闸门演练 `npm run verify:v15-deploy` | **PASS 12 / FAIL 0**：该放行的放行（含 `./dist/` 这种纯写法差异不得误杀）、该拒绝的逐条拒绝（sha 不符 / 期望 sha 仍是占位符 / 包不存在 / `.br`=0 / 条目不在 `dist/` 下），且六次拒绝后**现役 dist 的 sha 未变**、没写 `backups/`、没替换 dist。演练第一跑就把我自己的夹具打回炉过一次（我把 `basename` 当成员打包，条目成了 `good/dist/…`，闸门判红是**对的**） |
 | 构建链（①–⑪ 逐段跑，顺序未乱） | 字体预算 ✓ 图片 ✓ 埋点接线 ✓ 知识库 ✓ vitest ✓ 计划锚点 31/31 ✓ 直跑版迁移 ✓ vite build ✓ 动画边界 ✓ precompress(45 br) ✓ esbuild ✓ |
 | `vitest run` | **37 passed（4 文件）**——23 条 v14 存量 + 14 条本轮新增识鱼测试 |
+| 首屏预算（`scripts/smoke-static.mjs`，自起服务） | 主 JS = `index-MZH_DVpL.js`，**br 52.0 KB**（v14 是 51.9 KB → **+0.1 KB**，预算 ≤70）、CSS 6.5 KB（≤12）；br/gzip/identity 三种协商、ETag→304、按需 chunk（SpotFieldForm 1.3 KB / SpotExpertReport 1.4 KB ≤12）、埋点上报 8 项断言**全部 PASS**，脚本打印「全部通过」 |
+| ✅ 同一次 `verify:static` 的退出码缺陷（**已修并复验**） | 第一次跑：断言全过、打印「全部通过」，进程却以 **exit=127** 收场（libuv 在 Windows 上收尾时抛句柄断言）。根因与 v14 修 `verify-deploy.mjs` 那次同族——`process.exit()` 在 socket 未摘除时打断 libuv，而**门禁只看退出码，退出码说谎比没有门禁更糟**（这句话本来就在 CHANGELOG 十五节里）。同一处方改完复验：**56 项 PASS、exit=0、无 assertion**。**仍没复验的是"它还能不能变红"**：占用端口 / 起桩服务这类夹具在本机被策略拦过，我没换通道重试 → 留在 B-44，不当作已闭环 |
 | `check:sql` / `check:docs` / `verify:handoff` | 见本节末「收尾复核」 |
 
 ### 新测试钉住了什么、**没**钉住什么

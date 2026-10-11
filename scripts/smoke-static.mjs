@@ -250,5 +250,9 @@ try {
   failures += 1;
 } finally {
   child.kill();
-  process.exit(failures === 0 ? 0 : 1);
+  // 与 verify-deploy.mjs 同一处方（CHANGELOG 十五节记过这个坑）：
+  // Windows 上调 process.exit() 会在 socket 还没摘除时打断 libuv，表现为
+  // 「打印完 全部通过 却 exit=127」。门禁只看退出码，退出码说谎比没有门禁更糟，
+  // 所以这里只设 exitCode，让事件循环自然收尾。
+  process.exitCode = failures === 0 ? 0 : 1;
 }
