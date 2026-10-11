@@ -2,19 +2,195 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/) 与 [Keep a Changelog](https://keepachangelog.com/zh-CN/) 规范。
 
-## [v8.12.0] - 2026-10-06 「帖子交互专项」（迭代计划 v14，A+B+C 全量，一次性交付）
+## [v8.13.0] - 2026-10-11 「识鱼」（迭代计划 v15，K3 鱼种识别 + 预付费计费闭环）
 
-> 状态：🟢 **编码与本地验收完成，已提交至分支 `v14-post-interaction`（**不写具体 commit 数**，它在每次文档提交后就会过期；要清点用 `git log --oneline 134dcd3..HEAD`）**；
-> 生产侧**已备份、产物已上传校验一致、部署脚本已就位**，唯**数据库迁移待人工执行**
-> （取生产库口令 + 现网 DDL 按策略不应由自动化通道做，见下「上线状态」）。
-> ⚠️ **迁移与代码替换的顺序是硬约束，不可拆**：新代码硬依赖
+> 状态：🟡 **上线准备完成，尚未上线**——生产仍是 **v8.12.0**（2026-10-07 15:15 起，线上 `/opt/quyu/dist/boot.js` =
+> `7775cba9e3e0acc8…`，本轮开头实测过；新产物的 `boot.js` 是 `565c1f8a…`，两者不同即证明还没切）。
+> 代码全部**未提交**（截至本轮准备时工作区仍是 12 改 + 8 新，最后一次提交是 2026-10-07 13:07）。
+> ⚠️ **这一版有一个部署解决不了的洞**：生产 `/opt/quyu/.env` 里**没有 `MOONSHOT_API_KEY` 这一行**
+> （2026-10-11 实测，只数不打印），而悬浮球入口是**默认可见**的（`src/components/FloatingBall.tsx` 的
+> 功能菜单无条件列出「识鱼 · 识鱼种」）→ 切上去之后每个人都能点进去，但每次识别都会回
+> 「识别服务暂未开通，请稍后再试」（412，刻意降级、不是崩溃）。**要不要在配好 Key 之前暴露入口，是产品决定**。
+
+### 交付物与身份
+
+- `E:/tmp/dist-v8.13.0-r1.tar.gz`，sha256 `f89ede3fbcca21f4f0cbed6a30e0e5bf1012eb390463c2d9cbb47c14a27d83d8`
+  （183 条目 / 45 个 `.br` / 条目全在 `dist/` 之下 / 无 `data-dbg` / 包内只有 `dist/`，没有 `package.json`、没有 `scripts/`）
+- 包内 `dist/boot.js` = `565c1f8adc42c738a129781ce356270958a16dfd69e0fa91366dd517dc4ea949`，与本机 `dist/boot.js` 逐字节相同
+- 判据仍然是**源码 diff**而不是 tar 的 sha：本轮 `src/api/db` 相对 8.12.0 有真实改动，所以这一份**必须重传**，
+  不像 v14 那次"sha 变了但源码没变"的情形。
+
+### 这一版做了什么（按锚点，不按叙述）
+
+| 面 | 内容 | 锚点 |
+|---|---|---|
+| 识别链路 | 单次 K3 视觉调用 → Top-3 候选 + 置信度 + 鉴别依据；低置信**诚实降级不硬猜**；返回非 JSON / 结构异常各自抛 `K3Error('parse')` | `api/kimi/fishId.ts` `identifyFish` / `parseFishResult` / `FISH_ID_SCHEMA` |
+| 知识库 | 16 种首发淡水鱼标准名 + 形态/鉴别要点，注入系统提示词压幻觉（零 token 本地检索） | `api/knowledge/fishSpecies.ts` `SUPPORTED_FISH` / `speciesPromptBlock` |
+| 计费 | 前 `FISH_ID_FREE_LIMIT`(默认 3) 次免费，用完按 `FISH_ID_PRICE_CENTS`(默认 30 分) 扣**共享余额**；免费次数 `fish_id_free_used` 与钓点各档**分列记账**；CAS 先占位、失败**全额退还** | `api/services/fishId.ts` `identifyFishCall` |
+| 台账合规 | `fish_id_calls` 只存元数据（鱼名/置信度/token/费用），**不存图片与正文** | `db/schema.ts` `fishIdCalls` |
+| 样本门控 | `fish_id_samples` 仅在**显式授权**下写入；`scope=features` 不碰磁盘、`scope=image` 才落盘到 `uploads/spots/`；未授权时**一个字节都不写** | `api/services/fishId.ts` `maybeSaveSample` / `saveSampleImage` |
+| 接口 | 4 个新过程：`app.fishId.balance`(query) / `identify` / `correct` / `sampleConsent`(mutation)，全部要求登录 | `api/feature-router.ts` `fishId` |
+| 入口与页面 | 悬浮球改为「哪钓 / 识鱼」二选一菜单；新路由 `/fish-id`（懒加载） | `src/components/FloatingBall.tsx`、`src/App.tsx`、`src/pages/FishId.tsx` |
+| 顺带 | 规则检索加了同参数缓存（热更时失效） | `api/knowledge/index.ts` `RULE_CACHE` |
+
+### 上线准备里我修掉的四个真问题（不修就上线会出事）
+
+1. **`0015_fish_id_run.sql` 当时只有手写版、没进 drizzle journal**（journal 停在 `14:0014_v14_comment_report`）。
+   后果不是"生产建不出表"，而是**CI 的空库路径永远建不出这两张表**——两条 schema 悄悄分叉。
+   已生成配对 `db/migrations/0015_fish_id.sql` + `0015_snapshot.json`，journal 现为 16 条（末条 `15:0015_fish_id`）。
+   并给 `npm run verify:handoff` 加了两道**版本无关**的判据：每份 `*_run.sql` 必须有同名 journal 条目、必须有生成版配对。
+2. **`verify:handoff` 自己写死了 v14**：默认 `--tar` 指到 `dist-v8.12.0-r8.tar.gz`、脚本清单点名三个 v14 文件、
+   迁移断言硬编码 0013/0014、还要求 `journal 最后一条 idx === 14`。
+   照它跑 v15 会**对着上一版的包报全绿**——和 v14 上线当天"服务器包与期望 sha 自洽"是同一类假绿灯。
+   现在：`--tar` **必须显式给**（不给就硬失败并列出候选包），脚本改为扫 `scripts/v1\d-*.sh`，迁移判据改成上面那条通用规则。
+3. **新部署脚本的第⑥步探针差点重犯 v14 的错**：v14 用 POST 调 query 过程，tRPC 恒回 405
+   `Unsupported POST-request to query procedure`，于是**每次成功部署都会显红**（见 v8.12.0「部署记录」）。
+   `scripts/v15-deploy.sh` 里 query 走批量 GET、mutation 走 POST，并把「路由没注册(404/405)」与「运行期故障(5xx)」分成两种红。
+4. **`.env.example` 缺三个新变量**，会让 `verify:handoff` 第 4 项直接红。补齐时顺手查出一个**口径冲突**并如实写进注释：
+   `FISH_ID_MIN_CONFIDENCE_X100` 唯一读它的是 `api/kimi/fishId.ts` 的 `isHighConfidence()`，
+   而该函数**当前没有任何调用点**；真正决定文案的是 `api/knowledge/fishSpecies.ts` 的 `FISH_ID_MIN_CONFIDENCE = 0.55`
+   和 `src/pages/FishId.tsx` `confidenceTone` 里另一个硬编码 0.55。
+   → **改这个环境变量今天不会改变线上表现**，别把它当开关用（收敛成单一来源登记为 B-38）。
+
+### 本轮实测到的证据（都是现跑，不是抄上一版）
+
+| 检查 | 结果 |
+|---|---|
+| `bash -n` + CR 字节数 | `v15-deploy.sh`、`v15-deploy-drill.sh` 均通过、**CR=0**（仓库已钉 `*.sh eol=lf`） |
+| 部署闸门演练 `npm run verify:v15-deploy` | **PASS 12 / FAIL 0**：该放行的放行（含 `./dist/` 这种纯写法差异不得误杀）、该拒绝的逐条拒绝（sha 不符 / 期望 sha 仍是占位符 / 包不存在 / `.br`=0 / 条目不在 `dist/` 下），且六次拒绝后**现役 dist 的 sha 未变**、没写 `backups/`、没替换 dist。演练第一跑就把我自己的夹具打回炉过一次（我把 `basename` 当成员打包，条目成了 `good/dist/…`，闸门判红是**对的**） |
+| 构建链（①–⑪ 逐段跑，顺序未乱） | 字体预算 ✓ 图片 ✓ 埋点接线 ✓ 知识库 ✓ vitest ✓ 计划锚点 31/31 ✓ 直跑版迁移 ✓ vite build ✓ 动画边界 ✓ precompress(45 br) ✓ esbuild ✓ |
+| `vitest run` | **37 passed（4 文件）**——23 条 v14 存量 + 14 条本轮新增识鱼测试 |
+| `check:sql` / `check:docs` / `verify:handoff` | 见本节末「收尾复核」 |
+
+### 新测试钉住了什么、**没**钉住什么
+
+`api/services/fishId.test.ts`（14 条）用桩数据源钉钱路与合规门控：有免费次数时只碰 `fishIdFreeUsed` 不碰余额、
+免费用完才预扣 `balanceCents` 且扣的就是 `FISH_ID_PRICE_CENTS`、余额不足时**不调模型也不写台账**、
+入参不是 `data:image/` 时**一次 UPDATE 都不许有**（扣费必须发生在格式校验之后）、
+识别失败时付费退余额/免费退次数且台账记 `error`+`costCents=0`、
+没配 Key 时回 412「暂未开通」而不是伪装成 500、未授权时样本表零写入且**磁盘零新文件**、
+`scope=features` 写入但 `imagePath` 必须为 null、`scope=image` 才真落盘并自清、
+台账字段里出现 `image|content|base64` 即判越界、首查会补 0 余额行（`onDuplicateKeyUpdate`）、
+纠正反馈只打最近一条且超 32 字截断、无样本行时不许凭空 UPDATE。
+
+**它没钉住的两件事，我不写成已覆盖**：
+
+1. **SQL 守卫文本**（`fish_id_free_used < limit`、`balance_cents >= price`、退还的 `GREATEST(... -1, 0)`）。
+   桩里那些 where 片段是 drizzle 私有结构，对它做字符串断言会在升级后悄悄退化成"匹配不到也算通过"；
+   真验要连库，而本机 DB 层不可用。→ B-40。
+2. **每条断言各自变红的证据**。我按规矩尝试往 `api/services/fishId.ts` 注入 4 个变异（不退还 / 改错余额列 /
+   去掉 no-key 分支 / 忽略授权门控），**该操作被本机策略拦下，我没有换第二条通道重试**。
+   已拿到的红是真实但不同的那一类：把桩的 `read/write` 从方法写成属性时 **13/14 立刻全红**，
+   证明这 14 条确实在执行被测代码、不是空跑。→ B-39。
+
+### 部署面：这一版会动生产什么
+
+- 迁移：只有 **0015**（`user_balance.fish_id_free_used` + `fish_id_calls` + `fish_id_samples` + 3 个索引），
+  全加法、新列带 `NOT NULL DEFAULT 0`、新表 `IF NOT EXISTS` → **回滚代码不需要回滚库**。
+- 结构核对用**逐条数值比较**而不是 v14 那种 grep 一整串 CONCAT 字面量：v14 的写法差一个空格就会"永远拒绝部署"，
+  而它当时能钉是因为有隔离沙箱；本轮本机没有可用 DB 层，**我不生产自己无法当场验证的字符串等式**。
+- 备份：全库 `mysqldump`（判据仍是 ≥29 表 + `Dump completed`）**并且新增一步把现役 dist 也归档**
+  （v14 只归档到 `/root`，是靠人手做的；这一步进脚本才不会再漏）。
+- 期望 sha 由 `bash /root/v14-resync-sha.sh <tar> <deploy 脚本>` 现算（脚本本身与版本无关，只是默认值写着 v14 路径）。
+- 回滚仍只有 `app/scripts/v14-rollback.sh` 这一条**布局无关**的路径，且**必须显式传备份路径**（B-36 的硬要求）。
+- 未纳管旧账：`/root/v14-deploy.sh` 仍只在服务器上（B-32）。
+
+### 上线还欠的东西（别把"准备好"读成"可以无脑切"）
+
+- **MOONSHOT_API_KEY 未配** → 识鱼入口点了必回 412。要么先配 Key，要么先把入口收起来。
+- **识鱼准确率没有任何留存证据**：评测集实测是 **315 张**（17 个目录，含 30 张干扰图），
+  **不是**先前说的 534 张；而且 `scripts/eval-fishid.ts` 只 `printReport`、**从不落盘**，
+  所以 `eval-fishid/results.json` 根本不存在，本机也没有 `.env`（拿不到真 Key）→ 之前"已跑批量评测"这句话
+  **不成立**，Top-1 准确率是未知的。→ B-37。
+- 评测集 39 MB 未决定要不要进 git（我没动 `.gitignore`，也没 `git add` 它）。→ B-41。
+- v14 那三条真机 UI 行为依旧没有运行时证据，且**这一版又加了新的真机面**（悬浮球菜单二选一、`/fish-id` 拍照链路）。
+- 阿里云机审仍未开（`IMAGE_MODERATION_ENABLED=false`），与 v14 同。
+
+### 上线四步（第 0 步在本机，第 3 步也在本机）
+
+0. `node scripts/verify-handoff.mjs --tar E:/tmp/dist-v8.13.0-r1.tar.gz` → 0 失败才算交接物本身对得上
+1. 上传：`E:/tmp/dist-v8.13.0-r1.tar.gz` → `/root/dist-v8.13.0.tar.gz`；
+   `app/scripts/v15-deploy.sh` → `/root/v15-deploy.sh`；
+   `app/db/migrations/0015_fish_id_run.sql` → `/root/v15-sql/0015_fish_id_run.sql`
+2. 上机：`bash /root/v14-resync-sha.sh /root/dist-v8.13.0.tar.gz /root/v15-deploy.sh`
+   → `bash /root/v15-deploy.sh gates`（先看闸门，不碰任何东西）→ `bash /root/v15-deploy.sh`
+3. 回本机：`node scripts/verify-deploy.mjs --base http://47.109.185.118:3000 --tar E:/tmp/dist-v8.13.0-r1.tar.gz`
+   全 PASS；再 `sha256sum /opt/quyu/dist/boot.js` 应当等于 `565c1f8a…`
+
+（步骤 2 的"先 gates"是本轮新增的用法：它把不可逆的部分和可回退的部分分开，出问题时能先知道是包不对还是库不对。）
+
+
+## [v8.12.0] - 2026-10-07 上线（编码与本地验收完成于 2026-10-06）「帖子交互专项」（迭代计划 v14，A+B+C 全量，一次性交付）
+
+> 状态：🟢 **已上线**——2026-10-07 15:15 CST 生产切到 v8.12.0，迁移已生效、结构核对通过、上线后复核 10/10 PASS，
+> 逐条实测数字见下「部署记录」。分支 `v14-post-interaction` 已提交但**仍未 push**（**不写具体 commit 数**，
+> 它在每次文档提交后就会过期；要清点用 `git log --oneline 134dcd3..HEAD`），因此仓库内那份 CI **至今没跑过第一次**。
+> ⚠️ 「迁移与代码替换的顺序是硬约束，不可拆」这条已按序满足：新代码硬依赖
 > `comments.{author_avatar,images,like_count,deleted_at}`、`comment_likes`、`post_favorites`、
 > `reports.comment_id`、`idx_comments_post_like`、`idx_comments_parent`，缺任一都会运行期报错，
-> 评论列表与收藏首当其冲。**因此现在生产上跑的仍是 v8.11.0，未切换。**
+> 评论列表与收藏首当其冲——脚本先跑迁移、再核对结构，**结构不符就拒绝切码**，实测核对行与期望字面量逐字节相符。
 > 需求对齐见 `docs/产品/迭代计划-v14-草案.md`，术语裁定见 `CONTEXT.md`，
 > 不可逆决策见 `docs/adr/0001~0005`，运维与验收证据见 `docs/NEXT-ITERATION.md` 第九节。
 > 主线：把「打开帖子」从路由跳转改为**全屏弹层**，顺手拆掉**帖子图片 base64 入库**这颗雷，
 > 并把评论区从"能看"做到"能用"。
+
+### 部署记录（2026-10-07 15:13–15:16 CST，全程实测）
+
+- **执行通道**：本机 workbench CLI（阿里云 ECS 助手）打到 `quyu0001` / `i-2vce1c7cs1wy1fyhtzrw`（成都）。
+  上一节写的"这一步只能人工"在**这一次被用户明确授权替换**：用户自行选中该 CLI 技能并下达"把最新版本上线"，
+  我在只读准备全部做完后停在那条不可逆命令前，用「动作 + 目标 + 影响面」要了一次显式确认，答复是"直接执行部署"。
+  策略边界因此是"**不可逆那一条必须先问**"，不是"自动化通道永远不能碰"。
+- **切之前先自证线上身份**：`/opt/quyu/dist/boot.js` = `6b5897df98d8568a…`（= 8.11.0），
+  服务 `active`，`/` 剩 33G。产物里没有任何版本字符串，所以"线上是哪一版"只能这样量，不能读文档。
+- ⚠️ **上一节那条 sha 记录已过期，且照它做会放行错包**：服务器上 `/root/dist-v8.12.0.tar.gz` 实际是
+  `921d3f14872d9c4a…`（不是文档写的 `ca1c4a00…4532f`），而 `/root/v14-deploy.sh` 第 23 行的 `SHA_EXPECTED`
+  **当时已经等于 `921d3f14…`**——也就是"产物已过期"这件事被一个自洽的旧 sha 对完全掩盖了，
+  直接 `bash /root/v14-deploy.sh` 会**用一份错的产物通过 sha 闸门**。
+  `921d3f14…` 与本机 `E:/tmp/old-builds/` 里 r2…r7 及那份 `dist-v8.12.0.tar.gz` 的 sha **一个都不对得上**
+  （尺寸也各不相同），即服务器上那份是本地无副本的唯一一份 → 我没有覆盖它，而是改名留档
+  `/root/dist-v8.12.0.tar.gz.stale-921d3f14`（这个文件名不匹配脚本用到的任何 glob），再上传新包。
+  **教训**：看到"本地 sha ≠ 文档 sha"时，先量服务器实际值、再 diff 源码；文档里记的摘要只是历史快照。
+- **交付物上传与逐字节核对**（上传前逐个查过远端目标是否存在并告知覆盖）：
+  `E:/tmp/dist-v8.12.0-r8.tar.gz` → `/root/dist-v8.12.0.tar.gz`，服务器端 sha
+  `bafa1fec8370f7525b43f9ebf98013e7a436be956dc16fe1dcde2b090b424ddd` 与本地**完全一致**；
+  `scripts/v14-resync-sha.sh`（`33384bec…`）、`scripts/v14-rollback.sh`（`37c4e763…`）也逐字节一致。
+  **这两个脚本此前根本不在服务器上**——即"要回滚了才发现机器上没有退路"那种情形真的存在过，现已就位；
+  三个远端文件 `bash -n` 均通过，包内 180 条目、44 个 `.br`、条目全部在 `dist/` 之下。
+  `/root/v14-sql/001{3,4}_*_run.sql` 与仓库版 sha 相同（`ec097f08…` / `f1748feb…`），无需重传。
+- `bash /root/v14-resync-sha.sh` 把 `SHA_EXPECTED` 从 `921d3f14…` 改写为 `bafa1fec…`，
+  原脚本备份在 `/root/v14-deploy.sh.bak-before-sha-resync`，改写后 `bash -n` 通过。
+- `bash /root/v14-deploy.sh` **exit 0**，六步实测输出：
+  1. 新备份 `backups/quyu-before-v8.12.0-20261007-151455.sql.gz` → 29 表 / 24 INSERT / 含 `Dump completed`；
+  2. `0013`、`0014` 直跑版各两遍无错（第二遍全 skip）→ **生产 DDL 已落地**；
+  3. 结构核对行 = `comments 新列=4 / 新表=2 / reports.comment_id=1 / uq_report 列数=3 / 评论新索引=2`，
+     与脚本字面量逐字节相符 → 允许切码；
+  4. sha 期望=实际 `bafa1fec…`；解包有 `dist/boot.js` + `dist/public/index.html` + 126 个 assets；`.br` = 41 ≥ 30；
+  5. `mv` 旧 dist 到 `/root/dist-replaced-20261007-151455` → 原子替换 → `systemctl restart quyu` → `active`；
+  6. 线上探针：首页 200（裸传 1477 B / br 协商 503 B）、`/api/perf` 204、三条 tRPC 探针 **405**（见下条，是仪表坏了）。
+- **`v14-deploy.sh` 第⑥步是一个每次成功部署都会显红的坏仪表（尚未修）**：它用 **POST** 去调
+  `app.posts.comments` / `app.posts.myFavorites`，而这两个是 **query** 过程，tRPC 按协议回
+  `405 METHOD_NOT_SUPPORTED`（报文原文 `Unsupported POST-request to query procedure at path "app.posts.comments"`）
+  ——**健康的服务器上也是这样**。脚本第⑥步不参与退出码，所以它只是误导人，不会拦下部署。
+  该脚本**只存在于服务器上、不在仓库里**（`app/scripts/` 没有它），因此这段逻辑没有版本、没有测试、下次还会骗人；
+  要修就得把批量 GET 形态（`?batch=1&input=<编码后的批>`）写进去并实际验一次。
+  顺带一条我自己的假警报：第一次手探时我用 `?input=` 却没带 `batch=1`，得到 400 `expected object, received undefined`
+  ——那是**我的探针写错**，不是服务故障；journal 里那段时间每个真实请求都是 `status:"ok"`。
+- **上线后复核 `node scripts/verify-deploy.mjs --base http://47.109.185.118:3000 --tar E:/tmp/dist-v8.12.0-r8.tar.gz`
+  → 10/10 PASS、exit 0**，其中两条是新信息：
+  ① 线上入口 JS `/assets/index-HdRk0PXS.js` 与交付包同名成员 sha256 相同（`0df9389f4750801c…`），
+  线上 `/opt/quyu/dist/boot.js` 现为 `7775cba9e3e0acc8…` = r8 包内那份 → **"线上跑的就是这份包"有直接证据**；
+  ② v14 第一次在生产使用的 `JSON_*()` 查询函数（`postCoverSql`，被 feed/detail/comments 共用）**真的跑通了**，
+  journal 显示 `app.feed` 7ms、`app.posts.detail` 7ms、`app.posts.comments` 10ms、`app.posts.myFavorites` 4ms 全 `ok`
+  → 第「已用证据清掉的上线风险」里那条"生产引擎可能是 TiDB、未必支持 JSON 函数"的悬案**由观察收敛**，
+  但仍然没有一次 `SELECT VERSION()` 实测，口径冲突本身还挂着（见 `docs/NEXT-ITERATION.md` 第九节）。
+- **回滚这条路已实测可用（B-32 的未知布局疑问现在有答案）**：备份包 `/root/dist-before-v8.12.0-20261006-205956.tar.gz`
+  的条目以 `dist/` 开头，解到 `/tmp/rb-probe-20261007` 后包内 `boot.js` 哈希
+  `6b5897df98d8568a…`——与切换前线上那份**逐字节相同**，即它确实是正在被替换掉的那一版。
+  因此脚本自带 `--rollback` 分支的 `--strip-components=1` 对这份包**是正确的**，布局无关的
+  `bash /root/v14-rollback.sh /root/dist-before-v8.12.0-20261006-205956.tar.gz` 同样正确（**回滚必须显式传路径**，
+  自动挑最新那份的改动已被 B-36 回退）。回滚只回代码，不回库。
+- **仍未生效的东西别说它生效了**：`IMAGE_MODERATION_ENABLED` 依旧是 `false`，
+  图片机审**在生产上没有开着**；`PUBLIC_MEDIA_BASE_URL` 也未配。
 
 ### 上线状态（2026-10-06 生产预检实测）
 
@@ -25,7 +201,9 @@
 - 已完成：全库备份 `backups/quyu-before-v8.12.0-*.sql.gz`（29 表 / 24 INSERT / 含
   `Dump completed` 结束标记）；旧 dist 归档 2.5M；`uploads/` 确认存在（11M，含 avatars）且
   热更流程不触碰它；0013/0014 直跑版已上传 `/root/v14-sql/`；
-  `dist-v8.12.0.tar.gz` 上传后**服务器端 sha256 与本地一致** `ca1c4a00…4532f`，
+  `dist-v8.12.0.tar.gz` 上传后**服务器端 sha256 与本地一致** `ca1c4a00…4532f`
+  （⚠️ 这一份随后被机审返工判为过期，上线当天服务器上的实际值又既不是它、也不是本文档记的任何一份——
+  以 `6b5897df…` 为切出点的那次部署实测见上「部署记录」第二条），
   tar 内 **44 个 `.br`**、**0 条反斜杠路径**（避开 v8.10.x 那类改名/打包致 404 的形态）。
 
     > 📌 **撤 B-24 之后我重建了一次产物，本地 sha 变成 `61dfeb7a883de1a2bb1916319716f0f3ac4269576f3184b28a98421c726df01c`，
@@ -36,6 +214,9 @@
     > "本地 sha ≠ 服务器 sha"都会条件反射地以为产物过期、进而误改 `SHA_EXPECTED` 或误重传；
     > 判定依据应当是**源码 diff**，不是 tar 的 sha。部署前自证一次：
     > `sha256sum /root/dist-v8.12.0.tar.gz`（期望 `ca1c4a00…4532f`）→ 与 `/root/v14-deploy.sh` 里的 `SHA_EXPECTED` 对齐。
+    > ⚠️ 上线当天这条自证**没能挡住错包**：服务器上那份已经是第三个值 `921d3f14…`，而脚本里的期望 sha **早已跟着它对齐**，
+    > 所以"闸门通过"和"包是对的"是两件事。真正管用的顺序是：**先量服务器那份到底是谁**（和本机各包 sha 逐一比对 +
+    > 源码 diff），把它改名留档，再上传要发的那一份，最后用 `v14-resync-sha.sh` 把闸门钉到新包上。
 
   ⚠️ **这里出过一次真实的部署物缺陷，留痕以免重犯**：我第一版打包的链子写成
   `vite build && esbuild && tar`，**漏了 `precompress.mjs`** → tar 内 `.br` 数为 **0**。
@@ -47,11 +228,12 @@
   > 顺带一条自我纠正：我往脚本里插第一版守卫时，嵌套引号把 `$BRN` 吃成了 `[ "" -ge 30 ]`——
   > `bash -n` 完全通过，却会让**每次部署都中止**。再次印证语法检查不等于功能正确，
   > 闸门类逻辑必须真跑一遍它的两种结局。
-- 待人工：`bash /root/v14-resync-sha.sh /root/dist-v8.12.0.tar.gz /root/v14-deploy.sh`
-  把期望 sha 对齐到重传后的产物（见第十节：机审返工动了 `api/`，旧那份已过期），
-  再 `bash /root/v14-deploy.sh`。脚本自带备份完整性校验、迁移跑两遍验幂等、
-  **结构不符则拒绝切代码**、sha256 不符则中止、解压结构核对、原子替换、
-  服务未起来时给出一条命令回滚 dist，并有 `--rollback` 分支。
+- ~~待人工~~ **已执行（2026-10-07 15:14，逐条实测见上「部署记录」）**：
+  `bash /root/v14-resync-sha.sh /root/dist-v8.12.0.tar.gz /root/v14-deploy.sh`
+  把期望 sha 对齐到重传后的产物（机审返工动了 `api/`，旧那份确实过期），再 `bash /root/v14-deploy.sh`。
+  脚本自带的六道闸门**全部真的触发过**：备份完整性校验（29 表 / `Dump completed`）、迁移跑两遍验幂等、
+  **结构不符则拒绝切代码**（本次相符）、sha256 比对（改对齐后才通过——这条正是它该做的事）、解压结构核对、
+  原子替换、`systemctl restart` 后 `active`；服务没起来时会打印一条命令回滚 dist，并有 `--rollback` 分支。
 - **部署脚本本身已在沙箱逐项验证**（隔离 MySQL 26.7 + 真 tar 往返）。这一步不能省：脚本里
   任何一条判据写错，都会在**生产执行的那一刻**才暴露，那是最坏的发现时机。
 
@@ -61,7 +243,7 @@
   | 表数 `≥ 25` 的合理性 | 隔离库 dump 得 31 表 / 18 条 INSERT；生产实测 29 表 / 24 条 |
   | 结构核对要 grep 的字面量与 MySQL 实际输出相符 | `CONCAT(...)` 输出与脚本字面量**逐字节一致**（差一个空格就会"结构不符拒绝切码"，导致永远部署不上） |
   | 前向解包后存在 `dist/boot.js` + `dist/public/index.html` | 成立，126 个 assets 齐全 |
-  | `--rollback` 的 `--strip-components=1` 能还原正确布局 | 成立 |
+  | `--rollback` 的 `--strip-components=1` 能还原正确布局 | 成立。上线当天在服务器**那份真备份**上量到条目以 `dist/` 开头、包内 `boot.js` = 切换前线上的 `6b5897df…`——这是第十七节里"B-32 说本机读不到所以无法定论"的实测补齐 |
   | 幂等重跑的 `skip:` 输出**不会**被错误探测误判为失败 | 第二遍输出 16 行 `skip:`、命中 `ERROR` 正则 **0 行** |
 
   注：第一次跑 dump 判据时我的 `execSync` 用了 MSYS 风格路径，Windows 找不到 mysqldump，
@@ -226,6 +408,16 @@ reject；`mockFallback` 之所以看起来"永不成立"，真实原因是 react
 
 ### 九、明确未做 / 已知边界
 
+- **`v14-deploy.sh` 第⑥步是一台每次成功部署都会显红的坏仪表**（用 POST 调 query 过程 → 恒 405），
+  而这个脚本**只在服务器上、不在仓库里**——没有版本、没有测试、没人能审。下一轮该把它纳管，
+  探针改成批量 GET 形态（`?batch=1&input=<编码后的批>`）后真跑一次再交付。详见「部署记录」。
+- **已切上线但至今没有运行时证据的，仍是这四类**：三条真机 UI 行为（举报弹层重开是否干净 /
+  关注乐观态会不会被 refetch 盖回 / 退出登录是否清掉前一个账号的高亮）、阿里云真实网关联调
+  （QY-SAFE-003）、生产库 `SELECT VERSION()`（TiDB 与 MySQL 8 的口径冲突仍无实测，但 JSON 函数
+  已在生产跑通这一事实由上线后复核给出）、直跑版迁移的 **ALTER 分支**（CI 那步只会走 skip，B-34）。
+  前两类要用户的设备与 AK，后两类要一个能连生产库的通道。
+- **图片机审在生产上并没有开**：`IMAGE_MODERATION_ENABLED` 仍为 `false`，`PUBLIC_MEDIA_BASE_URL` 未配。
+  "v14 已上线" ≠ "违规图会被拦"。
 - feed 本体 offset→游标 **B-10 仍在**（本轮只做了评论游标分页）。
 - 存量 base64 回填**未执行**（工具就绪，取决于生产预检命中行数；见下）。
 - 渔获墙 / 审核队列仍全列读 `posts.images`（**B-18/B-19**）：前者是真缺陷（2-4MB 白传给客户端，
@@ -243,9 +435,11 @@ reject；`mockFallback` 之所以看起来"永不成立"，真实原因是 react
 
 1. ~~生产库预检~~ **已完成**（只读查询被放行，我跑了）：未删帖 13 条中仅 1 条图片仍是
    base64，`images` 合计 0.93 MB，`comments` 仅 4 条 → 存量迁移面极小，回填建议顺手做掉。
-2. **执行迁移与切码**：`bash /root/v14-deploy.sh`（取现网库口令做 DDL 按策略不应由自动化通道执行，
-   这一步只能人工）。产物 sha256、迁移幂等、结构核对、原子替换、回滚提示都已写进脚本，
-   且脚本自身的六项判据已在沙箱逐项验证（见上「上线状态」）。
+2. ~~**执行迁移与切码**~~ **已完成（2026-10-07 15:15，生产即 v8.12.0）**：`bash /root/v14-deploy.sh` 六道闸门逐条触发、
+   `verify-deploy --tar` 10/10 PASS（见上「部署记录」）。执行通道是本机 workbench CLI，**不是"只能人工上机敲"**——
+   做法是把只读准备全部做完，然后在**唯一那条不可逆命令**前用「动作 + 目标 + 影响面」要一次显式授权，
+   答复"直接执行部署"后代跑。所以上一版那句"这一步只能人工"应当修正为：
+   **不可逆的那一条必须由人拍板，拍板之后可以由自动化执行**（见 `docs/NEXT-ITERATION.md` 第九节）。
 3. **APK 无需重打包**（已核实而非推理）：v14 未引入新原生插件——评论图片复用既有
    `lib/native.ts` 的 `pickImages`/`capturePhoto`，本轮新增文件对 capacitor **零引用**，
    `package.json` 里 capacitor 依赖版本无变化。
