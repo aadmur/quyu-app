@@ -295,8 +295,9 @@ export default function FloatingBall() {
     const heldMs = (e?.timeStamp ?? 0) - hold.current.downAt
     const action = classifyGesture({ moved: d.moved, heldMs })
     if (action === 'navigate') {
-      // B-45：点一下就是进哪钓。这条路径上**不出现全屏遮罩**——于是"同一次点击的 click
-      // 被刚渲染出来的遮罩接走、菜单自己把自己关掉"那条我无法复现的假设，直接失去了发生条件。
+      // B-45 的正解：点一下就是进哪钓。用户报的"打不开"经查只有一个成因——
+      // 菜单当时钉在视口右下、不跟球（球贴左缘时离它 278px），点下去只看到屏幕暗了一下。
+      // （另一条"同一手势的 click 被刚渲染的遮罩接走"的猜测已被 file:// 夹具证伪：click 落的是球。）
       navigate('/fish-spot')
       return
     }
@@ -362,9 +363,10 @@ export default function FloatingBall() {
       {showMenu && menuPos && (
         <div
           className="qy-fishball-mask"
-          /* 关闭绑 pointerdown，不绑 click：菜单是 pointerup 那一刻才渲染的，而 click 会在
-             pointerup 之后按落点重新命中——绑 click 等于把「同一次点击自己关掉菜单」的风险
-             留在代码里（B-45 那条我没能复现的假设，现在让它失去发生条件：点按路径上没有遮罩）。 */
+          /* 关闭绑 pointerdown 而不是 click：按压即关，手感更直接。
+             （原先我猜"同一手势的 click 会在 pointerup 后落到刚渲染的遮罩上、菜单自己关掉"——
+             2026-10-11 用户手工在 file:// 夹具上点出来 click 落的是球，**那条假设已被证伪**。
+             这里只是手感选择，不是在修 bug。） */
           onPointerDown={(e) => {
             if (!(e.target as HTMLElement).closest('.qy-fishball-menu')) setShowMenu(false)
           }}

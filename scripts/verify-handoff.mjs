@@ -121,6 +121,17 @@ else {
     shipped.length === 0
       ? pass('包里没有 package.json/scripts（仓库侧脚本改动不需要重出产物）')
       : bad('包里居然含 package.json 或 scripts/ —— "改文档不影响产物"的推断不再成立', shipped.join(','))
+    // boot.js 必须以 esbuild 的 createRequire banner 开头。
+    // 为什么要单独一条：整树比对是"包 vs 本机 dist"，两边出自同一次构建——
+    // 打包命令少带一个参数时**两边一起错**，那道闸门照样全绿。
+    // 2026-10-11 真实踩过：重出 r3 时 esbuild 漏了 --banner:js，boot.js 里 65 处 require(
+    // 在 ESM 下必 ReferenceError，服务根本起不来，而当时的 handoff 是 0 失败。
+    const bootHead = tarLines(['-xzOf', TP(TAR), 'dist/boot.js'])
+    const BANNER = "import { createRequire } from 'module'"
+    bootHead && bootHead[0] && bootHead[0].startsWith(BANNER)
+      ? pass('boot.js 以 createRequire banner 开头（缺它则 ESM 里 require 未定义，服务起不来）')
+      : bad('boot.js 开头不是 createRequire banner —— esbuild 少了 --banner:js，部署后必然起不来',
+        bootHead ? `首行=${JSON.stringify((bootHead[0] || '').slice(0, 64))}` : '读不到 boot.js')
   }
 
   // 整棵 dist 与交付包逐文件比对。为什么不止比 boot.js：入口一致只能证明后端壳子对得上，
