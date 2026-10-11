@@ -36,6 +36,7 @@ const Moderation = lazy(() => import('@/pages/Moderation'))
 const PondApply = lazy(() => import('@/pages/PondApply'))
 const FollowList = lazy(() => import('@/pages/FollowList'))
 const FishSpot = lazy(() => import('@/pages/FishSpot'))
+const FishId = lazy(() => import('@/pages/FishId'))
 const Recharge = lazy(() => import('@/pages/Recharge'))
 const Terms = lazy(() => import('@/pages/Terms'))
 const Privacy = lazy(() => import('@/pages/Privacy'))
@@ -122,6 +123,7 @@ export default function App() {
         <Route path="moderation" element={<LazyMax><Moderation /></LazyMax>} />
         <Route path="pond-apply" element={<Lazy><PondApply /></Lazy>} />
         <Route path="fish-spot" element={<Lazy><FishSpot /></Lazy>} />
+        <Route path="fish-id" element={<Lazy><FishId /></Lazy>} />
         <Route path="fish-spot/recharge" element={<Lazy><Recharge /></Lazy>} />
         <Route path="terms" element={<Lazy><Terms /></Lazy>} />
         <Route path="privacy" element={<Lazy><Privacy /></Lazy>} />

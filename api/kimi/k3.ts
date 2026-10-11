@@ -370,7 +370,7 @@ function emptyUsage(): K3Usage {
 }
 
 /** 统一调用 K3：超时 + 5xx/网络抖动重试；attempts=1 时不重试 */
-async function callK3(
+export async function callK3(
   body: unknown,
   opts: { timeoutMs: number; attempts: number },
 ): Promise<{ content: string; usage: K3Usage }> {

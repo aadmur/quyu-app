@@ -167,6 +167,31 @@ const CSS = `
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-5px); }
 }
+
+/* 功能选择菜单（v15：哪钓 / 识鱼） */
+.qy-fishball-mask {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(45, 30, 30, 0.25);
+  opacity: 0; animation: qy-mask-in 0.18s ease forwards;
+}
+.qy-fishball-menu {
+  position: fixed; z-index: 41;
+  display: flex; flex-direction: column; gap: 8px;
+  opacity: 0; transform: translateY(8px) scale(0.96);
+  animation: qy-menu-in 0.22s cubic-bezier(0.2,0.8,0.3,1.2) forwards;
+}
+.qy-fishball-menu button {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 20px; border: 1px solid var(--color-line, #e0d5c5);
+  border-radius: 14px; background: var(--color-paper-white, #fffaf5);
+  font-size: 15px; font-weight: 600; color: var(--color-ink, #2d1e1e);
+  box-shadow: 0 4px 16px rgba(45,30,30,0.10); cursor: pointer;
+  transition: transform 0.12s ease;
+}
+.qy-fishball-menu button:active { transform: scale(0.96); }
+.qy-fishball-menu button .qy-menu-icon { color: var(--color-lake, #1d8093); }
+@keyframes qy-mask-in { to { opacity: 1; } }
+@keyframes qy-menu-in { to { opacity: 1; transform: translateY(0) scale(1); } }
 `
 
 interface Pos { x: number; y: number }
@@ -187,6 +212,7 @@ export default function FloatingBall() {
   const btnRef = useRef<HTMLButtonElement>(null)
   const [pos, setPos] = useState<Pos>(() => readPos())
   const [dragging, setDragging] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
   const drag = useRef({ startX: 0, startY: 0, baseX: 0, baseY: 0, moved: false, active: false })
 
   /** 量取手机壳尺寸（最近定位祖先），用于边缘吸附与边界钳制 */
@@ -223,7 +249,7 @@ export default function FloatingBall() {
     d.active = false
     setDragging(false)
     if (!d.moved) {
-      navigate('/fish-spot') // 点按：进入识别页
+      setShowMenu(true) // 点按：弹出功能选择菜单（v15：哪钓 / 识鱼）
       return
     }
     // 拖拽：水平吸附最近边缘，垂直保持
@@ -239,7 +265,7 @@ export default function FloatingBall() {
   const onKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
-      navigate('/fish-spot')
+      setShowMenu(true)
     }
   }
 
@@ -249,7 +275,7 @@ export default function FloatingBall() {
       <button
         ref={btnRef}
         type="button"
-        aria-label="哪钓 · 拍照识别钓点（可拖动调整位置）"
+        aria-label="AI 识别（哪钓识钓点 / 识鱼识鱼种，可拖动调整位置）"
         className={`qy-fishball${dragging ? ' qy-dragging' : ''}`}
         style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}
         onPointerDown={onPointerDown}
@@ -267,6 +293,25 @@ export default function FloatingBall() {
           </span>
         </span>
       </button>
+
+      {showMenu && (
+        <div className="qy-fishball-mask" onClick={() => setShowMenu(false)}>
+          <div
+            className="qy-fishball-menu"
+            style={{ right: `${MARGIN + 4}px`, bottom: `calc(max(var(--safe-bottom, 0px), 12px) + 76px + ${HIT + 8}px)` }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button type="button" onClick={() => { setShowMenu(false); navigate('/fish-spot') }}>
+              <span className="qy-menu-icon">钓</span>
+              哪钓 · 识钓点
+            </button>
+            <button type="button" onClick={() => { setShowMenu(false); navigate('/fish-id') }}>
+              <span className="qy-menu-icon">鱼</span>
+              识鱼 · 识鱼种
+            </button>
+          </div>
+        </div>
+      )}
     </>
   )
 }

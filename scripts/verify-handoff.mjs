@@ -5,12 +5,16 @@
  * 迁移 SQL、文档里的 sha）。这类"文档写一个 sha、磁盘上是另一个"的漂移本项目已经踩过一次
  * （服务器上的 ca1c4a00… 因机审返工而失效）。凡是这里能机械核对的，就不该留给人眼。
  *
- * 用法：node scripts/verify-handoff.mjs [--tar E:/tmp/dist-v8.12.0-r8.tar.gz]
+ * 用法：node scripts/verify-handoff.mjs --tar E:/tmp/dist-v8.13.0-r1.tar.gz
+ * **`--tar` 不给就硬失败**：这一项的默认值曾经写死成上一版产物（`dist-v8.12.0-r8.tar.gz`），
+ * 那等于"换一次上线就会对着一份旧包报绿"。v14 上线当天真实踩到的就是这一族问题——
+ * 服务器上的包是 `921d3f14…`，而部署脚本的期望 sha 已经跟着它自洽，整道闸门对着一份错包"通过"。
+ * 所以这里宁可要求每次上线显式指认交付物。
  * 退出码 = 失败项数；OPEN 项（只有真机/真实云账号能验的）不计失败，但会明确列出来。
  */
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -36,7 +40,30 @@ const shasum = (buf) => createHash('sha256').update(buf).digest('hex')
 // 见到 `E:\tmp` 会当成"远程主机 E:"；而 System32 的 bsdtar 认 E:/tmp/x.tar，见到 /e/… 报 Cannot open。
 // 两台机器可能选到不同的 tar，所以不猜：各试一次 `tar -tf`，用能读通的那一种；两种都不行就明确失败，
 // 绝不因为"探针没跑起来"而把产物断言算成通过。
-const TAR = resolve(arg('tar', 'E:/tmp/dist-v8.12.0-r8.tar.gz'))
+const TAR_ARG = arg('tar', '')
+if (!TAR_ARG) {
+  console.log('用法：node scripts/verify-handoff.mjs --tar <这次要上线的交付包>')
+  console.log('E:/tmp 下现存的包（按修改时间倒序；**由你确认哪一份才是要上线的那份**）：')
+  for (const line of candidates('/e/tmp')) console.log('  ' + line)
+  console.log('  FAIL  缺 --tar。这里故意不给默认值：默认值一旦指到上一版产物，本命令就永远"通过"')
+  process.exit(1)
+}
+function candidates(dir) {
+  // Node 在 Windows 上不认 Git Bash 的 /e/tmp，而 shell 侧两种都可能用到 → 两种各试一次。
+  // 这里失败不能静默：列不出候选就等于把人又推回"手敲路径"的坑，所以要打印原因。
+  for (const d of [dir, 'E:/tmp', 'C:/tmp']) {
+    try {
+      return readdirSync(d)
+        .filter((f) => f.endsWith('.tar.gz'))
+        .map((f) => ({ f, m: statSync(join(d, f)).mtimeMs }))
+        .sort((a, b) => b.m - a.m)
+        .slice(0, 6)
+        .map((x) => `${new Date(x.m).toISOString().slice(0, 16)}  ${x.f}   (${d})`)
+    } catch { /* 换下一个目录形式 */ }
+  }
+  return ['(读不到 E:/tmp 或 /e/tmp——直接给你要上线的包路径)']
+}
+const TAR = resolve(TAR_ARG)
 const FORMS = [
   (p) => p.replace(/\\/g, '/').replace(/^([A-Za-z]):\/+/, (_m, d) => '/' + d.toLowerCase() + '/'),
   (p) => p.replace(/\\/g, '/'),
@@ -165,7 +192,14 @@ else {
 
 // ── 2. 要上传的脚本 ──
 console.log('2) 交接脚本是否真的可用')
-for (const f of ['scripts/v14-resync-sha.sh', 'scripts/v14-rollback.sh', 'scripts/v14-rollback-drill.sh']) {
+// 不再写死 v14 那三个文件名：新增一版脚本却忘了纳管，正是"上线那一刻拿不到退路"的成因。
+// 现在按前缀扫，v15/v16 的部署脚本一落地就自动进入这道闸门。
+const deployScripts = readdirSync(join(root, 'scripts'))
+  .filter((f) => /^v1\d-.*\.sh$/.test(f))
+  .sort()
+  .map((f) => 'scripts/' + f)
+if (deployScripts.length === 0) bad('scripts/ 下一个 v1x-*.sh 都没有（部署/回滚脚本没纳管？）')
+for (const f of deployScripts) {
   const p = join(root, f)
   if (!existsSync(p)) {
     bad(`${f} 不在仓库里（上线/回滚那一刻拿不到它）`)
@@ -186,7 +220,9 @@ for (const f of ['scripts/v14-resync-sha.sh', 'scripts/v14-rollback.sh', 'script
 
 // ── 3. 迁移文件与 journal ──
 console.log('3) 迁移面')
-const migDir = join(root, 'db/migrations')
+// --mig 与 check-run-sql 的 --dir 同一个用途：给变异夹具指一份 migrations 的副本，
+// 这样"新加的判据能不能变红"是可证的，而不是我相信它能。
+const migDir = resolve(arg('mig', join(root, 'db/migrations')))
 const journal = JSON.parse(readFileSync(join(migDir, 'meta/_journal.json'), 'utf8'))
 const files = readdirSync(migDir)
 // drizzle 的 journal.tag 本身就带数字前缀（实测 tag="0000_remarkable_sasquatch"），
@@ -197,13 +233,27 @@ const mislabeled = journal.entries.filter((e) => !e.tag.startsWith(String(e.idx)
 missing.length === 0 && mislabeled.length === 0
   ? pass(`journal 的 ${journal.entries.length} 条都有对应 .sql 且 idx 与文件名前缀一致`)
   : bad('迁移链与 journal 对不上', `缺文件=${missing.map((m) => m.tag).join(',')} 前缀不符=${mislabeled.map((m) => m.idx + ':' + m.tag).join(',')}`)
-for (const tag of ['0013_v14_post_interaction', '0014_v14_comment_report']) {
+// 「每份手写生产直跑版都必须有同名的 journal 条目 + 生成版配对」。
+// 这条是本轮新加的，起因是真实缺陷：识鱼的 0015_fish_id_run.sql 当时只有手写版，
+// journal 停在 0014 —— 生产能建出表，而 CI 的空库路径永远建不出这两张表，两条 schema 会悄悄分叉。
+const runFiles = files.filter((f) => f.endsWith('_run.sql')).sort()
+const orphanRuns = runFiles.filter((f) => !journal.entries.some((e) => e.tag === f.slice(0, -'_run.sql'.length)))
+orphanRuns.length === 0
+  ? pass(`${runFiles.length} 份直跑版都进了 journal（tag 同名）`, runFiles.map((f) => f.replace('_run.sql', '')).join(','))
+  : bad('有直跑版迁移没进 journal（CI 空库建不出这些表/列）', orphanRuns.join(','))
+const unpaired = runFiles.filter((f) => !files.includes(f.replace(/_run\.sql$/, '.sql')))
+unpaired.length === 0
+  ? pass(`${runFiles.length} 份直跑版都有生成版配对`, 'drizzle 两条路径同构')
+  : bad('直跑版缺生成版配对', unpaired.join(','))
+for (const tag of ['0013_v14_post_interaction', '0014_v14_comment_report', '0015_fish_id']) {
   for (const suf of ['.sql', '_run.sql']) {
     existsSync(join(migDir, tag + suf)) ? pass(`${tag}${suf} 就位`) : bad(`缺 ${tag}${suf}`, '生产直跑版缺失＝上线无 SQL 可跑')
   }
 }
 const last = journal.entries[journal.entries.length - 1]
-last.idx === 14 ? pass(`journal 最后一条是 0014（v14 已进迁移链）`) : bad('journal 最后一条不是 0014', `实际 idx=${last.idx}`)
+last.idx === journal.entries.length - 1
+  ? pass(`journal 连续无洞，最后一条 idx=${last.idx}`, last.tag)
+  : bad('journal 有洞（条数与最大 idx 不吻合）', `条数=${journal.entries.length} 最后 idx=${last.idx}`)
 
 // ── 4. env 变量是否都有文档 ──
 console.log('4) 环境变量口径')

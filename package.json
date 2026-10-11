@@ -32,7 +32,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:image-backfill": "node scripts/migrate-post-images.mjs",
-    "db:image-backfill:apply": "node scripts/migrate-post-images.mjs --apply"
+    "db:image-backfill:apply": "node scripts/migrate-post-images.mjs --apply",
+    "verify:v15-deploy": "bash scripts/v15-deploy-drill.sh"
   },
   "dependencies": {
     "@capacitor/camera": "^7.0.5",

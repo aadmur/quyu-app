@@ -47,7 +47,7 @@ function SheetShell({
   )
 }
 
-/** 鱼种选择层：2 行 × 4 列胶囊网格，选中 olive 底白字，胶囊 stagger scale 0.8→1 */
+/** 鱼种选择层：4 列胶囊网格（v15 扩至 16 种 = 4 行 × 4 列），选中 olive 底白字，胶囊 stagger scale 0.8→1 */
 export function SpeciesPicker({
   open,
   value,

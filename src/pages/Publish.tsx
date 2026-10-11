@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
 import { m } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Camera, ChevronRight, Loader2, MapPin, Plus, Scale, X } from 'lucide-react'
+import { Camera, ChevronRight, Loader2, MapPin, Plus, Scale, ScanText, X } from 'lucide-react'
 import FishIcon from '@/components/FishIcon'
 import Toggle from '@/components/community/Toggle'
 import Toast from '@/components/community/Toast'
 import { useToast } from '@/components/community/useToast'
 import { SpeciesPicker, SpotPicker } from '@/components/community/PickerSheets'
-import { PUBLISH_SPOTS, PUBLISH_TOPICS, PUBLISH_SUCCESS_TOAST } from '@/data/community'
+import { FISH_SPECIES, PUBLISH_SPOTS, PUBLISH_TOPICS, PUBLISH_SUCCESS_TOAST } from '@/data/community'
 import { trpc } from '@/providers/trpc'
 import { useAuthGate } from '@/hooks/useAuthGate'
 import { pickImages, getCurrentPosition, reverseGeocode, type GeoFix, type GeoFailReason } from '@/lib/native'
@@ -72,6 +72,21 @@ export default function Publish() {
     },
   })
 
+  const fishIdMut = trpc.app.fishId.identify.useMutation({
+    onSuccess: (data) => {
+      const top = data.result.topCandidates[0]
+      if (top && data.result.isSupported && (FISH_SPECIES as readonly string[]).includes(top.name)) {
+        setSpecies(top.name)
+        showToast(`已识别：${top.name}（${Math.round(top.confidence * 100)}%）`)
+      } else if (top) {
+        showToast(`识别到 ${top.name}，但不在可选鱼种中`)
+      } else {
+        showToast(data.result.fallbackNote || '未能识别，请手动选择')
+      }
+    },
+    onError: (e) => showToast(e.message || '识鱼失败，请手动选择'),
+  })
+
   const { requireAuth, loginSheet } = useAuthGate()
 
   /** 从相册选图（多选），追加到照片列表 */
@@ -132,6 +147,12 @@ export default function Publish() {
 
   const appendTopic = (topic: string) => {
     setCaption((c) => (c.includes(topic) ? c : `${c}${c.endsWith(' ') || c === '' ? '' : ' '}${topic}`))
+  }
+
+  const identifyFromPhoto = () => {
+    if (photos.length === 0 || fishIdMut.isPending) return
+    if (!requireAuth('识鱼')) return
+    fishIdMut.mutate({ imageData: photos[0] })
   }
 
   return (
@@ -266,9 +287,25 @@ export default function Publish() {
               </span>
               <ChevronRight size={18} strokeWidth={1.8} className="text-ink-40" />
             </m.button>
+            {photos.length > 0 && (
+              <m.button
+                type="button"
+                variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
+                onClick={identifyFromPhoto}
+                disabled={fishIdMut.isPending}
+                aria-label="拍照识鱼"
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-lake-tint"
+              >
+                {fishIdMut.isPending ? (
+                  <Loader2 size={20} className="animate-spin text-lake" />
+                ) : (
+                  <ScanText size={20} className="text-lake" />
+                )}
+              </m.button>
+            )}
             <m.div
               variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
-              className="flex h-12 w-[120px] items-center gap-1 rounded-xl bg-paper-white px-3"
+              className="flex h-12 w-[100px] items-center gap-1 rounded-xl bg-paper-white px-3"
             >
               <Scale size={18} strokeWidth={1.8} className="shrink-0 text-ink-40" />
               <input

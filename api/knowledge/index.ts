@@ -66,6 +66,11 @@ let current: RuleSet = {
   error: null,
 };
 
+// ── 规则命中缓存（QY-SPOT-014 降本提速 §5.3-2）──
+// 同参数组合的检索结果缓存，避免重复打分；热更（规则表变化）时自动失效
+const RULE_CACHE = new Map<string, RuleMatch[]>();
+const RULE_CACHE_MAX = 100;
+
 const REQUIRED_ADVICE = [
   "method",
   "lineSpec",
@@ -123,6 +128,7 @@ function loadFromFile(file: string): void {
       loadedAt: new Date().toISOString(),
       error: null,
     };
+    RULE_CACHE.clear(); // 规则表更新，缓存失效
   } catch (err) {
     // 读/解析失败同样记住 mtime（若 stat 成功），否则每个识别都会重复读同一个坏文件
     current = { ...current, mtimeMs: st?.mtimeMs ?? current.mtimeMs, error: `读取规则文件失败：${String(err)}` };
@@ -259,9 +265,17 @@ function diversify(matches: RuleMatch[], topN: number, maxPerFish = 2): RuleMatc
   return out;
 }
 
+function cacheKey(q: RuleQueryInput): string {
+  return JSON.stringify({
+    wt: q.waterType, s: q.season, t: q.waterTempC, tod: q.timeOfDay,
+    c: q.clarity, f: q.flow, st: q.structures ?? [], tf: q.targetFish ?? [],
+  });
+}
+
 /**
  * Step 2 规则检索：本地打分，零 token。
  * 返回按分降序、鱼种多样化后的 Top-N；**空数组表示未命中，调用方须降级**。
+ * 同参数组合的结果被缓存（热更后自动失效），避免重复打分。
  */
 export function retrieveRules(query: RuleQueryInput, topN = 3): RuleMatch[] {
   refreshRules();
@@ -270,13 +284,23 @@ export function retrieveRules(query: RuleQueryInput, topN = 3): RuleMatch[] {
     waterType: query.waterType?.trim() || undefined,
     targetFish: (query.targetFish ?? []).filter(Boolean),
   };
+  const key = cacheKey(q);
+  const cached = RULE_CACHE.get(key);
+  if (cached) return cached.slice(0, topN);
+
   const matches: RuleMatch[] = [];
   for (const rule of current.rules) {
     const r = scoreRule(rule, q);
     if (r.matched) matches.push({ rule, score: r.score, reasons: r.reasons });
   }
   matches.sort((a, b) => b.score - a.score || a.rule.id.localeCompare(b.rule.id));
-  return diversify(matches, topN);
+  const result = diversify(matches, topN);
+  if (RULE_CACHE.size >= RULE_CACHE_MAX) {
+    const firstKey = RULE_CACHE.keys().next().value;
+    if (firstKey) RULE_CACHE.delete(firstKey);
+  }
+  RULE_CACHE.set(key, result);
+  return result;
 }
 
 /** 覆盖主流鱼种 × 主流水型 × 四季的覆盖率检查用：某组合是否有规则 */

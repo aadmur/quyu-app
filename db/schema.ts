@@ -391,6 +391,8 @@ export const userBalance = mysqlTable("user_balance", {
   freeUsed: int("free_used").notNull().default(0),
   // 已用免费专家报告次数（QY-SPOT-007 分层定价，与基础档免费额度分列记账）
   expertFreeUsed: int("expert_free_used").notNull().default(0),
+  // 已用免费识鱼次数（QY-FISH-003，与钓点各档免费额度分列记账，互不挪用）
+  fishIdFreeUsed: int("fish_id_free_used").notNull().default(0),
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
 }, (t) => [
   index("idx_user_balance_user").on(t.userId),
@@ -493,6 +495,50 @@ export type FishSpotCall = typeof fishSpotCalls.$inferSelect;
 export type FishSpotSample = typeof fishSpotSamples.$inferSelect;
 export type FishSpotFeedback = typeof fishSpotFeedback.$inferSelect;
 export type FishSpotSampleConsent = typeof fishSpotSampleConsents.$inferSelect;
+
+// ============ 识鱼 · 识别台账（计费对账；仅存元数据，不存图片/正文，合规最小化） ============
+export const fishIdCalls = mysqlTable("fish_id_calls", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  status: varchar("status", { length: 16 }).notNull(),      // ok / error
+  billing: varchar("billing", { length: 8 }).notNull(),     // free / paid
+  costCents: int("cost_cents").notNull().default(0),        // 向用户收取（免费=0）
+  /** Top-1 鱼种名（冗余，便于对账/运营） */
+  topFishName: varchar("top_fish_name", { length: 32 }),
+  /** Top-1 置信度 0-1 */
+  topConfidence: double("top_confidence"),
+  promptTokens: int("prompt_tokens").notNull().default(0),
+  completionTokens: int("completion_tokens").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("idx_fishid_user_created").on(t.userId, t.createdAt),
+]);
+
+export type FishIdCall = typeof fishIdCalls.$inferSelect;
+
+// ============ 识鱼 · 识别样本（微调备料；仅在显式授权下写入，默认不存图） ============
+export const fishIdSamples = mysqlTable("fish_id_samples", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  /** 关联台账行（可空：台账写失败不应阻断样本） */
+  callId: int("call_id"),
+  /** 授权后落盘的样本图路径（/uploads/spots/...）；未存图时为 null */
+  imagePath: varchar("image_path", { length: 255 }),
+  /** 完整识鱼结果 JSON（Top-3 候选 + 置信度 + 兜底说明） */
+  result: json("result"),
+  /** Top-1 鱼种名（冗余，便于检索与统计） */
+  topFishName: varchar("top_fish_name", { length: 32 }),
+  /** 用户纠正后的鱼种名（高价值标注；null = 未纠正） */
+  correctedFish: varchar("corrected_fish", { length: 32 }),
+  /** 样本状态：collected=已入库，labeled=已人工标注，exported=已导出 */
+  status: varchar("status", { length: 16 }).notNull().default("collected"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("idx_fishid_sample_user_created").on(t.userId, t.createdAt),
+  index("idx_fishid_sample_status").on(t.status),
+]);
+
+export type FishIdSample = typeof fishIdSamples.$inferSelect;
 
 export type Report = typeof reports.$inferSelect;
 export type PondApplication = typeof pondApplications.$inferSelect;

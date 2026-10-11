@@ -66,8 +66,17 @@ export const CATCH_STATS: CatchStat[] = [
 
 /* ------------------------------ 发布页 ------------------------------ */
 
-/** 鱼种（发布选择层 2 行 × 4 列） */
-export const FISH_SPECIES = ['鲫鱼', '鲤鱼', '草鱼', '翘嘴', '青鱼', '鳊鱼', '鲈鱼', '鳜鱼'] as const
+/**
+ * 鱼种（发布选择层）—— v15 扩展至 16 种，与 api/knowledge/fishSpecies.ts 的 SUPPORTED_FISH 对齐。
+ * 标准名经 normalizeFish 归一，识鱼结果可零映射回填。
+ * 选择层 UI 在 v15 C4 中调整为可滚动网格（原 2×4 → 4×4 或滚动）。
+ */
+export const FISH_SPECIES = [
+  '鲫鱼', '鲤鱼', '草鱼', '翘嘴',
+  '青鱼', '鳊鱼', '鲈鱼', '鳜鱼',
+  '鲢鱼', '鳙鱼', '鲶鱼', '罗非鱼',
+  '黄颡鱼', '白条', '黑鱼', '麦穗鱼',
+] as const
 
 export interface PublishSpot {
   id: string

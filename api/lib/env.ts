@@ -42,6 +42,12 @@ export const env = {
   /** 专家报告免费体验次数（与基础档免费次数分列记账） */
   fishSpotExpertFreeLimit: optInt("FISH_SPOT_EXPERT_FREE_LIMIT", 1),
 
+  // ── 识鱼 · 计费（单位：分；单次调用成本低于钓点基础档） ──
+  fishIdPriceCents: optInt("FISH_ID_PRICE_CENTS", 30),
+  fishIdFreeLimit: optInt("FISH_ID_FREE_LIMIT", 3),
+  /** 低置信阈值：Top-1 置信度低于此值时诚实降级（不硬猜） */
+  fishIdMinConfidence: optInt("FISH_ID_MIN_CONFIDENCE_X100", 55) / 100,
+
   // ── 内容安全 · 阿里云图片机审（v14，AK/Secret 只进服务器 .env，绝不进 APK/代码库） ──
   // 未配置 Key 或未显式启用时的行为（重要，这是产品决策不是 bug）：
   // 图片照常落盘、帖子/评论照常发布，同时向 reports 写一条 [系统] 待人工复核记录——

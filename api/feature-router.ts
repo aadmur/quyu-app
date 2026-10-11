@@ -45,6 +45,7 @@ import { recommendFeed, followingFeed, trackEvent } from "./services/recommendSe
 import { getProfile, updateUserProfile, getProfileOverview } from "./services/profileService";
 import { getVersionInfo } from "./services/appVersion";
 import { adminCredit, getBalance, identify, knowledgeStatus, recharge, setSampleConsent, submitFeedback } from "./services/fishSpot";
+import { getFishIdBalance, identifyFishCall, correctFish } from "./services/fishId";
 
 /**
  * MVP 演示用户：未登录时以 userId=1 体验完整链路。
@@ -713,6 +714,41 @@ export const featureRouter = createRouter({
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
         if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "仅限平台管理员" });
         return adminCredit(input.targetUserId, input.amountCents);
+      }),
+  }),
+
+  // ============ 识鱼 · K3 鱼类识别（QY-FISH-002/003） ============
+  // 余额与钓点识别共用 userBalance.balanceCents；免费次数独立记账，互不挪用
+  fishId: createRouter({
+    // 余额/免费次数：资金相关，必须真实登录
+    balance: tracedPublic.query(async ({ ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+      return getFishIdBalance(ctx.user.id);
+    }),
+    // 拍照识别鱼种：先占免费/预扣余额 → 调 K3 → 失败退还 → 成功出 Top-3 候选卡
+    identify: tracedPublic
+      .use(rateLimit({ capacity: 30, refillPerSec: 30 / 3600, key: actorKey, message: "识别太频繁，请稍后再试" }))
+      .input(z.object({
+        imageData: z.string().max(6_000_000),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录后再识别" });
+        return identifyFishCall(ctx.user.id, input);
+      }),
+    // 纠正反馈："识错了，实际是 X"（高价值标注，QY-FISH-006）
+    correct: tracedPublic
+      .use(rateLimit({ capacity: 30, refillPerSec: 30 / 3600, key: actorKey, message: "操作太频繁，请稍后再试" }))
+      .input(z.object({ correctedFish: z.string().min(1).max(32) }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+        return correctFish(ctx.user.id, input);
+      }),
+    // 样本授权（复用 fish_spot_sample_consents，QY-FISH-006 合规：默认不存图，显式授权才存）
+    sampleConsent: tracedPublic
+      .input(z.object({ granted: z.boolean(), scope: z.enum(["image", "features"]).optional() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
+        return setSampleConsent(ctx.user.id, input.granted, input.scope ?? "image");
       }),
   }),
 });

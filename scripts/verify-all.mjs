@@ -25,6 +25,10 @@ const want = (flag) => process.argv.includes(flag)
 const strict = want('--strict')
 
 const SUITE = [
+  // 两个 shell 演练：Windows 上 spawnSync('bash') 能不能命中取决于 Git Bash 是否在 PATH，
+  // 命不中会以 exit=-1 出现——那是**探针失败**，不能读成"演练通过"，所以下面把 -1 单独说明。
+  { name: '回滚演练（v14 夹具）', cmd: 'bash', args: ['scripts/v14-rollback-drill.sh'], needs: 'static' },
+  { name: '部署闸门演练（v15 夹具）', cmd: 'bash', args: ['scripts/v15-deploy-drill.sh'], needs: 'static' },
   { name: 'tsc 类型检查', cmd: 'node', args: ['node_modules/typescript/bin/tsc', '-b'], needs: 'static' },
   { name: 'eslint', cmd: 'node', args: ['node_modules/eslint/bin/eslint.js', '.'], needs: 'static' },
   { name: '单元测试（vitest）', cmd: 'node', args: ['node_modules/vitest/vitest.mjs', 'run'], needs: 'static' },
