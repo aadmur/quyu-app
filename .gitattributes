@@ -3,3 +3,9 @@
 # 会以难以察觉的方式失败（`set -euo pipefail\r`、变量值尾部带 \r）。
 # v14 的上线交接要求这些脚本能原样上传到服务器直接跑，所以在这里钉死。
 *.sh text eol=lf
+
+# 比赛材料的 SHA256 清单按 LF 计算。Windows 检出时若转成 CRLF，校验会全红；
+# 这里只对文本文件钉死 LF，PDF/PNG 保持原字节。
+docs/competition/**/*.md text eol=lf
+docs/competition/**/*.html text eol=lf
+docs/competition/**/*.sha256 text eol=lf

@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<title>趣渔 · AI Prompt 历史快照</title>
+<style>
+@page { size: A4; margin: 19mm 16mm 18mm 16mm; }
+* { box-sizing: border-box; }
+body {
+  font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+  font-size: 10pt; line-height: 1.67; color: #1c1c1c; margin: 0;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  orphans: 2; widows: 2;
+}
+.cover { height: 240mm; display: flex; flex-direction: column; justify-content: center; page-break-after: always; }
+.cover .kicker { font-size: 10pt; letter-spacing: .28em; color: #237b86; margin-bottom: 10mm; }
+.cover h1 { font-size: 30pt; line-height: 1.25; margin: 0 0 7mm; border: 0; padding: 0; }
+.cover .sub { font-size: 13pt; color: #444; margin-bottom: 14mm; }
+.cover .meta { font-size: 9.6pt; color: #555; line-height: 2.0; border-top: 1px solid #d8d8d8; padding-top: 6mm; }
+.cover .meta b { color: #222; }
+h1.chapter { font-size: 19pt; margin: 0 0 6mm; padding-bottom: 2.5mm; border-bottom: 2px solid #237b86; page-break-before: always; page-break-after: avoid; }
+h2 { font-size: 13.5pt; margin: 6.0mm 0 2.4mm; color: #145a63; page-break-after: avoid; }
+h3 { font-size: 11.4pt; margin: 4.4mm 0 2.0mm; color: #1f1f1f; page-break-after: avoid; }
+p { margin: 0 0 2.4mm; text-align: justify; }
+ul, ol { margin: 0 0 2.6mm; padding-left: 6.5mm; }
+li { margin: 0 0 0.9mm; }
+blockquote { margin: 2.4mm 0 3.2mm; padding: 2.2mm 3.6mm; background: #f4f8f8; border-left: 3px solid #237b86; color: #26383a; page-break-inside: avoid; }
+blockquote p:last-child { margin-bottom: 0; }
+code { font-family: Consolas, "Courier New", monospace; font-size: 8.6pt; background: #f1f3f4; padding: .3mm 1.2mm; border-radius: 1.5px; }
+pre { background: #f6f7f8; border: 1px solid #e2e5e7; border-radius: 2px; padding: 2.5mm 3.2mm; overflow-wrap: anywhere; white-space: pre-wrap; font-size: 8.4pt; line-height: 1.5; page-break-inside: avoid; }
+pre code { background: none; padding: 0; font-size: 8.4pt; }
+table { width: 100%; border-collapse: collapse; margin: 2.0mm 0 3.0mm; font-size: 8.5pt; line-height: 1.45; page-break-inside: auto; }
+thead { display: table-header-group; }
+tr { page-break-inside: avoid; }
+th, td { border: 1px solid #cfd6d8; padding: 1.0mm 1.6mm; vertical-align: top; text-align: left; }
+th { background: #eaf2f3; font-weight: 600; }
+hr { border: 0; border-top: 1px solid #e0e0e0; margin: 6mm 0; }
+img { display: block; max-width: 100%; max-height: 95mm; margin: 3mm auto 2mm; border: 1px solid #ddd; }
+a { color: #166f7a; text-decoration: none; }
+strong { color: #111; }
+</style></head><body>
+
+<section class="cover">
+  <div class="kicker">COMPETITION MATERIAL · AI PROMPT SNAPSHOT</div>
+  <h1>趣渔 · AI Prompt 历史快照</h1>
+  <div class="sub">四个核心功能迭代的完整 Prompt 链 · 逐字摘录 · 含返工与回滚</div>
+  <div class="meta">
+    <div><b>项目</b>　趣渔（社区 / 票务 / 商城 / 塘主 SaaS）</div>
+    <div><b>代码版本</b>　v14-post-interaction 分支 HEAD（源码 8.13.0；生产 8.12.0）</div>
+    <div><b>会话来源</b>　Qoder JSONL 会话日志，SHA256 见导出说明</div>
+    <div><b>编制日期</b>　2026-10-19</div>
+  </div>
+</section>
+
+<blockquote>
+<p>比赛材料：核心功能迭代的完整 Prompt 链
+项目：趣渔（社区 / 票务 / 商城 / 塘主 SaaS）
+代码版本：<code>v14-post-interaction</code> 分支 HEAD（源码 8.13.0；生产 8.12.0）
+编制日期：2026-10-19
+原始会话：<code>78f64457-e692-48e2-b8f0-75054467d555</code>、<code>f7ff7f6e-3311-4705-bcdd-d517dd7071c4</code></p>
+</blockquote>
+<hr />
+<h2>导出说明</h2>
+<p>这份快照不是事后编写的“AI 使用心得”，而是从 Qoder 的 JSONL 会话日志里逐字抽取的对话记录，按四个核心迭代重组。每章包含：</p>
+<ol>
+<li><strong>用户的原始 Prompt</strong>（逐字，含时间）；</li>
+<li><strong>AI 的修改建议与依据</strong>（引用原话，保留它读过的文件、行号、约束）；</li>
+<li><strong>用户的裁定</strong>（结构化决策，取工具结果，不取可能回填错的入参）；</li>
+<li><strong>落地提交与文件</strong>；</li>
+<li><strong>Bug 修复链</strong>（包括 AI 判断错误、被用户证据推翻、以及回滚）；</li>
+<li><strong>验证证据与未验证边界</strong>。</li>
+</ol>
+<h3>两条编排规则</h3>
+<ul>
+<li><strong>只写日志里有的</strong>。AI 的自我总结不当作事实；能用提交、测试、线上哈希复核的，才写成结论。</li>
+<li><strong>不抹掉错误</strong>。案例二保留了“base64 通道不存在”的错误前提与返工；案例四保留了被用户截图证伪的假设②；案例一保留了 B-24 误报。这些是 Prompt 链的一部分，不是需要修饰的瑕疵。</li>
+</ul>
+<h3>会话源与校验</h3>
+<table>
+<thead>
+<tr>
+<th>会话</th>
+<th style="text-align:right">字节</th>
+<th>SHA256</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>78f64457-e692-48e2-b8f0-75054467d555.jsonl</code></td>
+<td style="text-align:right">12,600,829</td>
+<td><code>6095da2415e45d37f24d66c0ccd404d23a583fe70055728330aca511256b3b89</code></td>
+</tr>
+<tr>
+<td><code>f7ff7f6e-3311-4705-bcdd-d517dd7071c4.jsonl</code></td>
+<td style="text-align:right">4,335,643</td>
+<td><code>894a392d3638351d55c1563542b1bad1d6f2d074fedcb63e472a119fcd94f7e1</code></td>
+</tr>
+</tbody>
+</table>
+<p>原始 JSONL 不随仓库分发（体积大、含本地路径）；本文件中的引文可按上述哈希定位到同一份会话。单章文件与合订本内容一致，评审可按需选择阅读方式。</p>
+<h3>目录</h3>
+<ol>
+<li>案例一：v14 帖子交互重构——从一句需求到 13 次裁定</li>
+<li>案例二：图片落盘与机审返工——AI 先给错前提，再自己推翻</li>
+<li>案例三：v15 识鱼——上线前审计出六类阻断项</li>
+<li>案例四：B-45——一句“哪钓打不开”，两个假设，一次回滚</li>
+</ol>
+<hr />
+<h1 class="chapter">案例一：v14 帖子交互重构——从一句需求到 13 次裁定</h1>
+<blockquote>
+<p><strong>会话</strong>：<code>78f64457-e692-48e2-b8f0-75054467d555</code>
+<strong>时间</strong>：2026-10-06 17:50 → 2026-10-07 10:38（CST）
+<strong>对应提交</strong>：59 条（<code>134dcd3..84f95ff</code>），核心落地 <code>a8be879</code> / <code>ef184cb</code> / <code>a3b9ea7</code>
+<strong>上线</strong>：2026-10-07 15:15，app 8.12.0，<code>verify:deploy --tar</code> 10/10 PASS</p>
+</blockquote>
+<hr />
+<h3>1. 起点：一句话，没有方案</h3>
+<p>用户的第一条输入是完整原文：</p>
+<blockquote>
+<p><strong>Prompt 1</strong>（2026-10-06 17:50）</p>
+<p><a href="plugin://grillme-matt@qoder-marketplace">@Grill Me</a> 我想对这个项目帖子做一些优化，如打开帖子，帖子详情页，帖子评论等交互</p>
+</blockquote>
+<p>没有指定页面结构、没有数据库要求、没有验收标准。AI 的第一步不是给方案，而是读代码。它先确认了项目身份与技术栈，再把「帖子线」的现状拆成两类：</p>
+<ul>
+<li><strong>A 类 · 纯前端交互</strong>：返回丢状态、详情页双击点赞时序写反、整卡不可点、无图片放大、键盘顶飞底栏、<code>feed.invalidate()</code> 大锤等 8 项；</li>
+<li><strong>B 类 · 能力缺口</strong>：收藏是假的（只有前端 state）、点赞态不回显、评论硬截断 50 条、评论无点赞/删除/图片、同一份评论数据两种形态、评论头像是算法编的等 6 项。</li>
+</ul>
+<p>同时给出了三条会卡住方案的硬约束：动画门禁禁止首屏静态闭包使用 <code>layoutId</code>/<code>drag</code>；首屏主 JS 预算 ≤70KB br、总传输基线 189.0KB br 不得回退；B 类要跑生产 MySQL 迁移。</p>
+<p><strong>这段的价值不在于列了多少问题，而在于它把“优化交互”翻译成了可裁定的技术分叉。</strong> 后续 13 个问题全部建立在这些事实上。</p>
+<hr />
+<h3>2. Prompt 链：用户输入 + AI 反问</h3>
+<p>比赛要求「完整 Prompt 链」。本案例的用户侧输入有两种：3 条自由输入，以及 13 次结构化决策。后者由 AI 用 <code>AskUserQuestion</code> 逐题提出，用户选择；问答原文都在会话日志里。</p>
+<h4>2.1 自由输入</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>时间（CST）</th>
+<th>原文</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>10-06 17:50</td>
+<td><code>我想对这个项目帖子做一些优化，如打开帖子，帖子详情页，帖子评论等交互</code></td>
+<td>定义主题</td>
+</tr>
+<tr>
+<td>2</td>
+<td>10-06 17:55</td>
+<td><code>继续</code></td>
+<td>首次请求被用户打断后恢复</td>
+</tr>
+<tr>
+<td>3</td>
+<td>10-07 10:38</td>
+<td><code>继续</code></td>
+<td>长任务续跑</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>说明：v14 的推进主要靠结构化决策，不是靠长 Prompt。这是刻意的交互方式——一次只问一个会影响实现的问题，避免一口气抛出 25 项让用户凭感觉勾选。</p>
+</blockquote>
+<h4>2.2 十三次裁定</h4>
+<p>下表「用户选择」一律取自工具结果 <code>Your questions have been answered: …</code>，不是工具入参里的回填值（原因见 §2.3）。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:right">#</th>
+<th>AI 的问题</th>
+<th>用户裁定</th>
+<th>对实现的直接影响</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right">1</td>
+<td>范围边界：A 类纯前端 / B 类动 DB？</td>
+<td><strong>A + B 全做</strong></td>
+<td>25 项、生产迁移、第三方服务</td>
+</tr>
+<tr>
+<td style="text-align:right">2</td>
+<td>列表内点击帖子用什么方式打开？</td>
+<td><strong>弹层详情 + URL 同步</strong></td>
+<td>Home 不卸载，返回状态从根上保住</td>
+</tr>
+<tr>
+<td style="text-align:right">3</td>
+<td>列表页评论按钮的行为？</td>
+<td><strong>删 CommentSheet，开 PostSheet 并弹键盘</strong></td>
+<td>全局只剩一种看帖形态，−150 行</td>
+</tr>
+<tr>
+<td style="text-align:right">4</td>
+<td>评论点赞存哪里？</td>
+<td><strong>新建 comment_likes 表</strong></td>
+<td>避开 <code>likes</code> 表已知事务隐患 B-06</td>
+</tr>
+<tr>
+<td style="text-align:right">5</td>
+<td>删评语义？</td>
+<td><strong>全软删 + 占位</strong></td>
+<td>不产生楼中楼孤儿</td>
+</tr>
+<tr>
+<td style="text-align:right">6</td>
+<td>帖子收藏存到哪？</td>
+<td><strong>并入 /favorites 加 Tab</strong></td>
+<td>干掉「渔获集」幽灵术语</td>
+</tr>
+<tr>
+<td style="text-align:right">7</td>
+<td>评论分页与楼中楼？</td>
+<td><strong>游标分页 + 折叠 + 热门/最新切换</strong></td>
+<td>两套游标语义</td>
+</tr>
+<tr>
+<td style="text-align:right">8</td>
+<td>帖子图片 base64 存库怎么处理？</td>
+<td><strong>插入图片落盘修复，评论图建在其上</strong></td>
+<td>触发案例二</td>
+</tr>
+<tr>
+<td style="text-align:right">9</td>
+<td>图片内容审核怎么补？</td>
+<td><strong>接阿里云内容安全机审</strong></td>
+<td>触发案例二</td>
+</tr>
+<tr>
+<td style="text-align:right">10</td>
+<td>图片区单击/双击冲突？</td>
+<td><strong>整卡可点，信息流取消双击点赞</strong></td>
+<td>单击零延迟，详情内保留双击</td>
+</tr>
+<tr>
+<td style="text-align:right">11</td>
+<td>懒加载 chunk 的零等待与体积红线？</td>
+<td><strong>idle 预加载 + 上滑转场</strong></td>
+<td>LCP 后 <code>requestIdleCallback</code> 预热</td>
+</tr>
+<tr>
+<td style="text-align:right">12</td>
+<td>25 项怎么分批？</td>
+<td><strong>一次性大版本</strong></td>
+<td>前端大改与 DB 迁移同批上线</td>
+</tr>
+<tr>
+<td style="text-align:right">13</td>
+<td>存量 base64 图片迁移后怎么处理？</td>
+<td><strong>先备份全表，再原地改写为 URL</strong></td>
+<td>回滚预案从“重要”变“必须”</td>
+</tr>
+</tbody>
+</table>
+<h4>2.3 一个日志陷阱：入参里的 <code>answers</code> 不一定是用户答案</h4>
+<p>会话日志里，<code>AskUserQuestion</code> 的工具入参带 <code>answers</code>，工具结果又带一段 <code>Your questions have been answered</code>。两者在改选/多题场景下会不一致，本案例出现了两次：</p>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>工具入参 <code>answers</code></th>
+<th>工具结果（本文采用）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>范围边界</td>
+<td>只做 B 类能力补齐</td>
+<td>A + B 全做</td>
+</tr>
+<tr>
+<td>图片存储</td>
+<td>只做传输瘦身，不落盘</td>
+<td>插入“图片落盘”修复，图片评论建在其上</td>
+</tr>
+</tbody>
+</table>
+<p>如果按入参写历史，案例二根本不会存在，整份 Prompt 快照也会变成假的。本文档的规则是：<strong>以工具结果为准，并在原始 JSONL 里保留行号供复核</strong>。这条规则本身也写进了 <code>docs/competition/README.md</code> §3.3。</p>
+<hr />
+<h3>3. AI 的关键建议与依据</h3>
+<h4>3.1 为什么是弹层，不是路由页</h4>
+<p>AI 先确认了路由结构，再给结论：</p>
+<blockquote>
+<p><code>/</code> 和 <code>/post/:id</code> 是 Layout 下的兄弟路由（App.tsx:99,104）→ 进详情时 Home <strong>整棵卸载</strong>，这就是“返回全丢”的根因。</p>
+</blockquote>
+<p>因此「纯路由 + 状态提升」需要把分页、滚动、tab、点赞态全部提升到路由层，改动面大且容易漏；「弹层 + <code>pushState</code>」让 Home 保持挂载，关闭时 <code>history.back()</code>，天然保住状态。<code>/post/:id</code> 路由页保留，只服务深链冷启动，两者共用 <code>PostContent</code>。</p>
+<h4>3.2 一个做不了的转场，提前说清</h4>
+<blockquote>
+<p><strong>图片 hero 共享元素转场（小红书那种图片飞入详情）在本项目做不了。</strong> 它需要列表项和详情页两边都挂 <code>layoutId</code>，而 <code>FeedPost</code> 位于首屏静态闭包，<code>check-motion-boundary.mjs</code> 明令禁止 → build 直接失败。能做的转场只有整页淡入/上滑（不需要 <code>layoutId</code>）。</p>
+</blockquote>
+<h4>3.3 门禁不是障碍，是设计输入</h4>
+<p>PostSheet 懒加载后带着 <code>CatchViewer</code>（<code>drag=&quot;x&quot;</code>），会落进首屏静态闭包。AI 读完门禁脚本后给出精确逃逸路径：</p>
+<ul>
+<li>Home/FeedPost 必须用<strong>动态 <code>import()</code></strong> 引入 PostSheet（门禁的 <code>resolveImports</code> 只跟静态 <code>import ... from</code>）；</li>
+<li><code>PostDetail</code> 从 <code>&lt;Lazy&gt;</code> 升级为 <code>&lt;LazyMax&gt;</code>；</li>
+<li>首次点击有下载延迟，用 idle 预热兜住。</li>
+</ul>
+<p>这不是“绕过门禁”，而是把门禁的静态分析规则当成模块边界来设计。最终产物里 <code>PostSheet</code> 是独立 chunk，首屏 189.0KB br 基线未回退。</p>
+<h4>3.4 「渔获集」是幽灵术语</h4>
+<blockquote>
+<p><strong>「渔获集」是个幽灵术语</strong>——全代码库只出现 1 次，就是 <code>Home.tsx:612</code> 那句 toast 文案，没有任何对应的表、页面或功能。</p>
+</blockquote>
+<p>用户选择并入 <code>/favorites</code> 加 Tab 后，AI 把这个词写进 <code>CONTEXT.md</code> 的禁用清单。这是“需求对齐”产生的一个非代码产物：<strong>术语裁定</strong>。</p>
+<h4>3.5 删除语义：为什么不是硬删</h4>
+<p>AI 指出硬删顶层评论会让子回复的 <code>parentId</code> 指向不存在的行。用户选择「全软删 + 占位」后，读取路径统一过滤 <code>deletedAt</code>，删除者与帖主有权限，占位文案保留楼层结构。</p>
+<hr />
+<h3>4. 落地：提交与文件</h3>
+<table>
+<thead>
+<tr>
+<th>提交</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>a8be879</code></td>
+<td>DB：<code>comment_likes</code>、<code>post_favorites</code>、<code>comments</code> 新列与索引</td>
+</tr>
+<tr>
+<td><code>ef184cb</code></td>
+<td>API：帖子图片落盘、feed 载荷瘦身、评论体系、收藏；机审接线</td>
+</tr>
+<tr>
+<td><code>a3b9ea7</code></td>
+<td>前端：PostSheet 全屏弹层、删 CommentSheet、整卡可点、收藏/评论接后端</td>
+</tr>
+<tr>
+<td><code>89d77b0</code></td>
+<td>文档：v8.12.0 变更记录 + backlog 登记 8 项新发现</td>
+</tr>
+</tbody>
+</table>
+<p>关键文件：</p>
+<ul>
+<li><code>src/components/home/PostSheet.tsx</code>、<code>src/components/community/PostContent.tsx</code></li>
+<li><code>src/pages/Home.tsx</code>（动态 import + idle 预热）</li>
+<li><code>api/services/community.ts</code>（评论/收藏/点赞）</li>
+<li><code>db/schema.ts</code>、<code>db/migrations/0013_*</code>、<code>0014_*</code></li>
+</ul>
+<hr />
+<h3>5. 修 Bug 链：用户如何引导 AI 收敛</h3>
+<h4>5.1 先修用户真碰到的两个死路</h4>
+<p><code>dae3397</code> 修掉：</p>
+<ul>
+<li>评论配图选图后界面挂死：喂进损坏/非图片文件时 <code>createImageBitmap</code> reject，旧的 <code>for … await compressImage()</code> 没有 <code>try/catch</code>，异常冒出后 <code>resolve()</code> 永不执行，外层 <code>await</code> 永久挂起。修法是逐张 <code>try/catch</code>，坏图跳过、好图保留、Promise 必定结算；</li>
+<li>「加载更多评论」是死按钮：失败后再次写入同一个游标不改变 query key，react-query 不重发；修法是游标相同则走 <code>refetch()</code>，文案切成「重试加载评论」。</li>
+</ul>
+<p>这两条不是代码审查发现的，是<strong>在浏览器里真点出来的</strong>。AI 把复现步骤和修复写进提交信息，后续回归有据可查。</p>
+<h4>5.2 交付前双轴审查：一次修 6 项</h4>
+<p><code>e938d7a</code> 的提交信息逐条记录了缺陷与修法。抽三条能说明“为什么静态检查不够”：</p>
+<blockquote>
+<ul>
+<li><code>FeedPost</code> 整卡 <code>onKeyDown</code> 不判 target：焦点在卡内按钮上按 Enter 会连带开弹层并 <code>preventDefault</code> 掉按钮自身激活 → 点赞/收藏/分享/更多全排键盘不可用</li>
+<li><code>CommentSection</code> 在途锁写成 <code>likeBusy != null</code>：一条评论点赞在飞时其它评论的点赞被静默吞掉</li>
+<li><code>PostContent</code> 删帖后 600ms 的 <code>onBack</code> 计时器无句柄：用户手动关闭后会二次 <code>history.back()</code>，把 Home 一起弹掉</li>
+</ul>
+</blockquote>
+<p>这三条都通过 <code>tsc</code>/<code>eslint</code>，只在真实交互路径上出错。修复后新增 <code>verify:static</code> 入口，并把 <code>vitest</code> 加进 <code>build</code> 链——<strong>单测不过就不产出可部署物</strong>。</p>
+<h4>5.3 举报面板：一次“差点修出新 Bug”的返工</h4>
+<p><code>6d098ec</code> 修「举报面板关闭再打开仍留着上次内容」。AI 的第一版在提交时复位 state，它自己否掉了：</p>
+<blockquote>
+<p>修法把 state 移进只在 open 期间挂载的内层组件，靠卸载丢弃：不用 <code>useEffect</code> 监听 open 复位（本项目 lint 红线 <code>set-state-in-effect</code>），也<strong>不在提交时复位</strong>——我第一版正是提交时复位，那会让“提交失败”把用户写好的说明一起清掉，等于自己引入一个新缺陷。</p>
+</blockquote>
+<p>紧接着 <code>c0b7b6e</code> 给条件子元素补 <code>key</code>，因为“单个条件子元素没 key 也恰好能工作”是巧合不是保证。</p>
+<h4>5.4 B-24：AI 报了一个不存在的回归，然后撤回</h4>
+<p>这是本案例最能说明“AI 建议需要被验证”的一段。</p>
+<p>AI 用「指向不存在数据库的服务」造出断库冷启动，观察到信息流空白、无骨架、无 toast，判断 v14 把 <code>feedQuery.error</code> 改成派生值后兜底失效，立案 <strong>B-24</strong>（<code>68b4aed</code>），并尝试了三种判据都没触发。它没有继续盲改：</p>
+<blockquote>
+<p>我连换三种判据（<code>isError</code> → 加 <code>errorUpdatedAt&gt;0</code> → 再加“已结算但无 data”）都没能触发，说明查询落在我尚未识别的状态上——<strong>继续换写法就是盲改</strong>，所以我 <code>git checkout</code> 回退了两次试验改动。</p>
+</blockquote>
+<p>用户回复：</p>
+<blockquote>
+<p><strong>Prompt</strong>（2026-10-06 22:26）</p>
+<p>好，那就把 B-24 查出根因。</p>
+</blockquote>
+<p>AI 改用临时 DOM 诊断属性，把 react-query 的真实状态渲染出来，读一次后删掉诊断，最终结论是<strong>误报</strong>：</p>
+<blockquote>
+<p><strong>1. B-24 是我的误报，已撤回。</strong> 兜底实测正常：断库冷启动 7 张演示卡 + toast + 点演示卡给出诚实提示，健康路径无误报。<code>Home.tsx:280</code> 的判据从头到尾是对的，三次试验改动都已回退。CHANGELOG/backlog/计划文档三处的错误结论已改正。</p>
+</blockquote>
+<p>对应提交 <code>7d3fb54</code>。<strong>这条链完整保留了“AI 提出错误判断 → 用户要求查根因 → AI 用可观测手段推翻自己 → 修文档”的全过程</strong>，没有把误报从历史里抹掉。</p>
+<hr />
+<h3>6. 验证与上线</h3>
+<table>
+<thead>
+<tr>
+<th>检查</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tsc -b</code> / <code>eslint</code></td>
+<td>0 错误</td>
+</tr>
+<tr>
+<td><code>vitest</code></td>
+<td>23/23（当时），含机审请求形状 13 条、落盘顺序 8 条、缓存清空 2 条</td>
+</tr>
+<tr>
+<td><code>verify:images</code></td>
+<td>连真实 MySQL 的带图发布链路 PASSED</td>
+</tr>
+<tr>
+<td><code>verify:static</code></td>
+<td>首屏 eager JS 148.7KB、CSS 6.44KB、按需 chunk 1.3–1.4KB，全通过</td>
+</tr>
+<tr>
+<td><code>verify:handoff --tar r8</code></td>
+<td>0 失败</td>
+</tr>
+<tr>
+<td><code>verify:deploy --tar r8</code></td>
+<td>10/10 PASS，含线上入口 JS 与交付包逐字节一致</td>
+</tr>
+<tr>
+<td>线上切换</td>
+<td><code>/opt/quyu/dist/boot.js</code> 由 <code>6b5897df…</code>（8.11.0）变为 <code>7775cba9…</code>（8.12.0）</td>
+</tr>
+</tbody>
+</table>
+<p>上线过程中的两个坑也写进了 CHANGELOG：文档里记的旧包 sha 与实际不符，照文档跑会让 sha 闸门放行错产物；回滚脚本此前根本不在服务器上。这两条直接促成了后来的 <code>verify:handoff</code> 泛化（案例三）。</p>
+<hr />
+<h3>7. 没有做到的</h3>
+<p><strong>三条真机 UI 行为至今没有人点过</strong>（<code>c0b7b6e</code> 的提交信息已如实写明）：</p>
+<ol>
+<li>举报弹层关闭再打开应为空白；</li>
+<li>关注按钮的乐观态不能被后台 refetch 盖回；</li>
+<li>退出登录后查看器级状态应清空。</li>
+</ol>
+<p>原因不是没写测试，而是当时仓库没有 jsdom、本机无 npm 装不了，浏览器自动化也不可用；这三条只有真实浏览器/真机能验。它们被写进交付清单和「明确未做」，没有被算进 23 条单测的绿灯里。</p>
+<hr />
+<h3>8. 证据索引</h3>
+<table>
+<thead>
+<tr>
+<th>证据</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>原始会话</td>
+<td><code>78f64457-e692-48e2-b8f0-75054467d555.jsonl</code>，SHA256 <code>6095da24…</code></td>
+</tr>
+<tr>
+<td>用户首条输入</td>
+<td>该 JSONL 第 4 行</td>
+</tr>
+<tr>
+<td>范围裁定</td>
+<td>第 70–72 行（工具入参与结果不一致，取结果）</td>
+</tr>
+<tr>
+<td>图片存储裁定</td>
+<td>第 200–202 行（同上）</td>
+</tr>
+<tr>
+<td>B-24 立案 / 撤回</td>
+<td>第 2022 / 3433 行附近；提交 <code>68b4aed</code> / <code>7d3fb54</code></td>
+</tr>
+<tr>
+<td>核心提交</td>
+<td><code>git show a8be879 ef184cb a3b9ea7 e938d7a 6d098ec c0b7b6e</code></td>
+</tr>
+<tr>
+<td>上线记录</td>
+<td><code>CHANGELOG.md</code> v8.12.0「部署记录（2026-10-07 15:13–15:16 CST）」</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 class="chapter">案例二：图片落盘与机审返工——AI 先给错前提，再自己推翻</h1>
+<blockquote>
+<p><strong>会话</strong>：<code>78f64457-e692-48e2-b8f0-75054467d555</code>
+<strong>时间</strong>：2026-10-06 18:11 → 23:25（CST）
+<strong>对应提交</strong>：<code>ef184cb</code>（落盘 + 瘦身）、<code>f1795ba</code>（机审返工）、<code>ff036e9</code> / <code>eb68c1c</code>（顺序契约）、<code>b0eda44</code>（真库冒烟）
+<strong>结论先行</strong>：落盘链路已上线；<strong>机审在生产上是关闭的</strong>，且从未打过真实网关。</p>
+</blockquote>
+<hr />
+<h3>1. 起点：一个比“交互优化”严重得多的问题</h3>
+<p>案例一问到「图片评论怎么做」时，AI 去查现有的上传链路，结果发现<strong>根本不存在 <code>/api/upload</code></strong>：帖子图片是 base64 直接写进 MySQL 的 <code>posts.images</code> JSON 列。</p>
+<blockquote>
+<p><strong>AI 的原话</strong>（2026-10-06 18:11）</p>
+<p>⚠️ 挖到一个<strong>必须先告诉你的生产隐患</strong>，它会影响本轮范围：</p>
+<p><strong>帖子图片是 base64 直接存进 MySQL 的。</strong></p>
+<ul>
+<li><code>pickImages()</code> 返回压缩后的 <strong>dataURL</strong>（最长边 1600px，JPEG q0.82）</li>
+<li><code>Publish.tsx:121</code> 把它原样塞进 <code>images: photos</code></li>
+<li><code>createPost</code> 直接 <code>images: input.images</code> 写进 <code>posts.images</code> JSON 列</li>
+<li><strong>没有 <code>/api/upload</code> 路由</strong>，没有落盘，没有大小校验；<code>boot.ts:15</code> 的 <code>bodyLimit</code> 是 <strong>50MB</strong>，等于不设防</li>
+</ul>
+</blockquote>
+<p>它没有停在“这是个坏味道”，而是列了四种必然的爆炸方式：</p>
+<ol>
+<li><code>recallCandidates()</code> 全列读 + 进程内存缓存 → 几十个真实九图帖就能撑爆单机 Node；</li>
+<li>feed 全量透传 → 一条真实图帖让首屏从 189KB 涨到 MB 级，v12 性能专项归零；</li>
+<li>单个九图帖约 2–4MB base64，逼近 <code>max_allowed_packet</code> 时 INSERT 静默失败；</li>
+<li>同一份 base64 在召回缓存、打分、MMR、页缓存里被复制多份。</li>
+</ol>
+<h4>第一次裁定</h4>
+<p>AI 给出四个选项，工具入参记录的是「只做传输瘦身，不落盘」，但工具结果里的用户答案是：</p>
+<blockquote>
+<p><code>Your questions have been answered: &quot;帖子图片 base64 存库这个隐患，本轮怎么处理？&quot;=&quot;插入“图片落盘”修复，图片评论建在其上&quot;</code></p>
+</blockquote>
+<p>这个选择把范围从“前端交互”扩到了“存储链路 + 合规”。AI 立刻指出下一步的硬约束：项目<strong>完全没有图片机审能力</strong>，而图片评论会把无审核的 UGC 图片入口从一个扩大到两个。</p>
+<h4>第二次裁定</h4>
+<blockquote>
+<p><code>&quot;图片内容审核怎么补？（这是硬合规项，不能默默绕过）&quot;=&quot;接阿里云内容安全机审&quot;</code></p>
+</blockquote>
+<p>至此，本轮同时接入了两件不可逆的事：<strong>存量图片地址改写</strong>与<strong>第三方内容安全服务</strong>。</p>
+<hr />
+<h3>2. AI 的第一个错误前提</h3>
+<p>为了接机审，AI 先把客户端写了出来，并在文档里写下“阿里云内容安全支持 base64 提交”。这个前提让它选择了<strong>审核先于落盘</strong>的顺序——图片还在内存里，直接 base64 发给网关，违规就不写盘，听起来更安全。</p>
+<p>但它在后续自查时去核对了官方文档，然后推翻了这句话：</p>
+<blockquote>
+<p><strong>AI 的更正</strong>（2026-10-06 23:01）</p>
+<p><strong>2. 核实 B-24 时顺手复核了自己写下的“官方文档确认支持 base64 提交”——那句话是错的。</strong> 内容安全两版接口（70292 的 2018-05-09、增强版 2022-03-02）<strong>都只接受可被服务端拉取的图片 URL</strong>，没有 base64 通道。旧实现启用后每次调用都会 4xx，再被我自己那套“失败就放行 + 转人工”的降级口径吞掉，表现成“机审已接入”而实际一张都没审成。</p>
+</blockquote>
+<p>这段话值得逐字读：错误不是“接口调不通”这种显性失败，而是<strong>4xx 被降级口径折叠成 <code>unavailable</code>，然后被当成“已接入”</strong>。如果没有回查官方文档，这个功能会以“绿灯”的形态上线，一张图都不审。</p>
+<p>对应提交 <code>f1795ba</code>，提交信息把三处根因写得很清楚：</p>
+<blockquote>
+<p>顺文档改掉三处：请求体改 <code>{scenes, tasks:[{dataId,url}]}</code>；补发四个必有的 <code>x-acs-*</code> 头并让它们参与 <code>CanonicalizedHeaders</code>；<code>Content-MD5</code> 不再 <code>.toUpperCase()</code>（base64 大小写敏感）。</p>
+<p>顺序因此改为「全部落盘 → 按公网 URL 审 → 明确违规则删掉本次新写的所有文件再拒收」，代价是一段最长 3s 的公网可达窗口，收益是链路真能跑通，且顺手修掉了旧注释里承认的孤儿文件遗留。</p>
+</blockquote>
+<hr />
+<h3>3. 重做后的链路</h3>
+<pre><code class="language-text">用户选图（dataURL）
+  → ingestImages() 校验类型/张数/路径穿越
+  → 写盘 uploads/{posts,comments}/
+  → 拼公网 URL（PUBLIC_MEDIA_BASE_URL）
+  → moderateImages() 逐张提交阿里云
+      ├─ pass        → 保留文件，写库
+      ├─ reject      → 删除“本次新写”的全部文件，拒收发布
+      ├─ review      → 保留文件，写一条 [系统] 待人工复核
+      └─ unavailable → 保留文件，写一条 [系统] 待人工复核
+  → 发布成功
+</code></pre>
+<p>几个容易被忽略、但提交里有明确断言的点：</p>
+<ul>
+<li><strong><code>Content-MD5</code> 大小写</strong>：base64 大小写敏感，旧实现 <code>.toUpperCase()</code> 会让网关算出的 MD5 与请求头不一致，必然 4xx。</li>
+<li><strong>四个 <code>x-acs-*</code> 头必须参与签名</strong>：只加头不参与 <code>CanonicalizedHeaders</code>，签名仍然错。</li>
+<li><strong>reject 只回滚本次新写</strong>：编辑帖子时，同批里已有的旧图不能被误删。<code>eb68c1c</code> 专门补了这条护栏。</li>
+<li><strong>结果条数少于图片数</strong>（审核服务半路挂掉）时，缺位按待审处理，不能漏文件。</li>
+</ul>
+<hr />
+<h3>4. 测试：把“请求长什么样”钉住</h3>
+<p>这是项目第一份 API 层单测。<code>api/services/imageModeration.test.ts</code> 用 mock <code>fetch</code> 断言：</p>
+<ul>
+<li>请求体是 <code>{scenes, tasks:[{dataId,url}]}</code>，不是 base64；</li>
+<li>必发四个 <code>x-acs-*</code> 头，<code>Content-MD5</code> 等于对 body 重算的标准 base64，且<strong>不等于它的大写形式</strong>；</li>
+<li><code>Authorization</code> 里的签名与按文档规则重算的结果一致；</li>
+<li>同批多图 = 多次调用，每次换新 nonce；</li>
+<li>服务非 200 / 4xx / 5xx / 网络异常一律折叠为 <code>unavailable</code>，绝不把异常抛给发布链路；</li>
+<li>开关不为 true、缺 <code>PUBLIC_MEDIA_BASE_URL</code>、缺 AK 时：一次请求都不发。</li>
+</ul>
+<p><code>api/services/imageStore.test.ts</code> 则钉顺序契约：</p>
+<ul>
+<li>全部 pass：文件保留，送审地址就是已落盘地址；</li>
+<li>明确 reject：抛 <code>BAD_REQUEST</code>，本次新写文件一张不留（含先 pass 的那张）；</li>
+<li>reject 不伤及同批既有图片；</li>
+<li>review/unavailable 计入待审，文件保留；</li>
+<li>外链、协议相对、路径穿越、超张数在写盘前就被拒。</li>
+</ul>
+<p>一个测试自身的坑也写进了提交：<code>path.resolve(cwd, &quot;/uploads/...&quot;)</code> 在 Windows 下会跳到盘根（<code>E:\uploads\...</code>），第一次跑是假失败；断言文件存在要用 <code>join + basename</code>。</p>
+<hr />
+<h3>5. 存量迁移：先数清，再动手</h3>
+<p>AI 没有直接写“全表 UPDATE”，而是先给生产库一条只读预检：</p>
+<pre><code class="language-sql">SELECT COUNT(*) FROM posts
+WHERE JSON_SEARCH(images, 'one', 'data:image%') IS NOT NULL;
+</code></pre>
+<p>结果（2026-10-07 上午）：</p>
+<blockquote>
+<p>未删帖 13 条中<strong>仅 1 条</strong>图片仍是 base64，<code>images</code> 合计 0.93MB。</p>
+</blockquote>
+<p>于是迁移工具 <code>scripts/migrate-post-images.mjs</code> 设计成：</p>
+<ul>
+<li>默认 <strong>dry-run</strong>，只打印将要改写的行；</li>
+<li><code>--apply</code> 才写库，写前导出原值备份；</li>
+<li>幂等，可重跑；</li>
+<li><code>--rollback</code> 用备份恢复。</li>
+</ul>
+<p>四条路径（dry-run / <code>--apply</code> / 幂等重跑 / <code>--rollback</code>）都在本地演练过。但——</p>
+<blockquote>
+<p><strong>存量 base64 回填未执行</strong>（工具就绪，取决于生产预检命中行数）。
+—— <code>CHANGELOG.md</code> 第 520 行</p>
+</blockquote>
+<p>那 1 条帖子至今可能仍是 base64。仓库没有留下 <code>--apply</code> 的生产执行记录，所以本文<strong>不声称已清零</strong>。</p>
+<hr />
+<h3>6. 生产状态：必须说“没开”</h3>
+<p><code>CHANGELOG.md</code> 第 517 行写得很直白：</p>
+<blockquote>
+<p><strong>图片机审在生产上并没有开</strong>：<code>IMAGE_MODERATION_ENABLED</code> 仍为 <code>false</code>，<code>PUBLIC_MEDIA_BASE_URL</code> 未配。“v14 已上线” ≠ “违规图会被拦”。</p>
+</blockquote>
+<p>原因是真实网关需要阿里云 AK，而 AI 没有、也不应该代用户开通。当前未配置时的行为是<strong>放行 + 写一条待人工复核记录</strong>，不是拒绝发布。这是刻意的 fail-open：</p>
+<blockquote>
+<p>现状本来没有任何图片机审，贸然 fail-closed 会让未开通该服务的部署彻底发不了图。
+—— <code>.env.example</code></p>
+</blockquote>
+<p><code>fail-open</code> 还是 <code>fail-closed</code> 至今没有拍板。这条被写进 <code>docs/NEXT-ITERATION.md</code> 的待办，也写进了本文的“未完成项”。</p>
+<hr />
+<h3>7. 这段 Prompt 链说明了什么</h3>
+<ol>
+<li><strong>AI 的第一版方案可能是错的，而且错得很安静</strong>。base64 前提导致 4xx，4xx 被降级吞掉，最终表现是“已接入”。只有回查官方文档才能发现。</li>
+<li><strong>用户的两次裁定改变了问题层级</strong>：第一次把“交互优化”扩到“存储拆弹”，第二次把“图片评论”扩到“合规链路”。AI 没有替用户做这两个决定，而是把代价和风险摊开。</li>
+<li><strong>“有测试”不等于“能上线”</strong>。13 条 mock 测试能证明请求形状对，不能证明真实网关通；所以开关保持 <code>false</code>，并且不把“机审已接入”写进任何完成声明。</li>
+</ol>
+<hr />
+<h3>8. 证据索引</h3>
+<table>
+<thead>
+<tr>
+<th>证据</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>隐患发现与四种爆炸方式</td>
+<td>会话 JSONL 第 149 行附近；<code>CHANGELOG.md</code> 第二节</td>
+</tr>
+<tr>
+<td>图片存储裁定</td>
+<td>JSONL 第 200–202 行（入参与结果不一致，取结果）</td>
+</tr>
+<tr>
+<td>机审裁定</td>
+<td>JSONL 第 208–210 行</td>
+</tr>
+<tr>
+<td>base64 前提被推翻</td>
+<td>JSONL 第 4538 行附近；提交 <code>f1795ba</code></td>
+</tr>
+<tr>
+<td>请求形状测试</td>
+<td><code>api/services/imageModeration.test.ts</code></td>
+</tr>
+<tr>
+<td>顺序契约测试</td>
+<td><code>api/services/imageStore.test.ts</code>、提交 <code>ff036e9</code> / <code>eb68c1c</code></td>
+</tr>
+<tr>
+<td>真库冒烟</td>
+<td><code>scripts/smoke-images.ts</code>、<code>npm run verify:images</code></td>
+</tr>
+<tr>
+<td>生产预检与“未回填”</td>
+<td><code>CHANGELOG.md</code> 第 295、520 行</td>
+</tr>
+<tr>
+<td>机审关闭声明</td>
+<td><code>CHANGELOG.md</code> 第 517 行、<code>.env.example</code> 第 56–73 行</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 class="chapter">案例三：v15 识鱼——上线前审计出六类阻断项</h1>
+<blockquote>
+<p><strong>会话</strong>：<code>f7ff7f6e-3311-4705-bcdd-d517dd7071c4</code>
+<strong>时间</strong>：2026-10-11 18:54 → 22:52（CST）
+<strong>对应提交</strong>：<code>1e3079c</code>（功能 + 迁移配对 + 门禁泛化）、<code>b862338</code>（部署脚本纳管）、<code>d52df46</code>（文档）、<code>b3d43f1</code>（exit=127 修复）、<code>3a77ff8</code>（上线记录）
+<strong>线上结果</strong>：19:55 上线 v8.13.0，22:44 回滚到 v8.12.0；回滚原因不是识鱼，见案例四</p>
+</blockquote>
+<hr />
+<h3>1. 起点：一句“再次上线最新版本”，两种含义</h3>
+<blockquote>
+<p><strong>Prompt 1</strong>（2026-10-11 18:54）</p>
+<p>再次服务器上线一下最新版本</p>
+</blockquote>
+<p>AI 先去量线上，而不是直接打包：</p>
+<ul>
+<li>线上仍是 8.12.0，<code>boot.js</code> = <code>7775cba9…</code>，与上次交付一致；</li>
+<li>工作区里的“最新”是未提交的 v15 识鱼；</li>
+<li>两者之间隔着<strong>一整套没做完的上线准备</strong>。</li>
+</ul>
+<p>它把这个歧义摊开，用户裁定：</p>
+<blockquote>
+<p><code>&quot;“再次上线最新版本”指的是哪一份？&quot;=&quot;先做完 v15 上线准备&quot;</code></p>
+</blockquote>
+<p>这句话把任务从“部署”改成了“先把不可上线的东西修到可上线”。</p>
+<hr />
+<h3>2. 上线前审计：六类阻断项</h3>
+<p>AI 对工作区、迁移、部署脚本、门禁、文档、产物逐项实测，得到下表：</p>
+<table>
+<thead>
+<tr>
+<th>检查</th>
+<th>实测结果</th>
+<th>为什么阻断</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>提交状态</td>
+<td>v15 全部未提交：12 改 + 4 个未跟踪文件 + <code>eval-fishid/</code></td>
+<td>没有可审的版本</td>
+</tr>
+<tr>
+<td>迁移</td>
+<td><code>0015_fish_id_run.sql</code> 不在 drizzle journal（15 条，末条是 0014），也没有配对的生成版 <code>0015_fish_id.sql</code></td>
+<td>CI 空库路径建不出 <code>fish_id_calls</code> / <code>fish_id_samples</code></td>
+</tr>
+<tr>
+<td>部署脚本</td>
+<td>服务器 <code>/root/v14-sql/</code> 只有 0013/0014；<code>/root/v14-deploy.sh</code> 的迁移清单和结构核对串硬编码 0013/0014</td>
+<td>照它跑不会应用 0015，新代码切上去就运行期报错</td>
+</tr>
+<tr>
+<td>门禁</td>
+<td><code>tsc</code> 0、<code>vitest</code> 23/23、<code>check:sql</code> 过；但 <code>.env.example</code> 没有三个识鱼变量</td>
+<td><code>verify:handoff</code> 第 4 项会 RED</td>
+</tr>
+<tr>
+<td>证据</td>
+<td>识鱼零测试；CHANGELOG / 迭代计划 / runbook / ADR 搜不到“识鱼”</td>
+<td>无验收、无记录</td>
+</tr>
+<tr>
+<td>产物</td>
+<td><code>app/dist/boot.js</code> 是 10-07 13:09 的，比 <code>FishId.tsx</code>（10-11 11:49）旧 4 天</td>
+<td>现有产物根本不含这功能</td>
+</tr>
+</tbody>
+</table>
+<p>这张表是本章的核心：<strong>“功能写完了”与“能上线”之间，隔着迁移、门禁、脚本、文档、产物五道独立的门。</strong> 任何一道没对齐，部署脚本都会以“成功”的形态把坏版本推上去。</p>
+<h4>一个更隐蔽的发现：门禁写死了上一版</h4>
+<p><code>verify:handoff</code> 当时是这样工作的：</p>
+<ul>
+<li>默认 <code>--tar</code> 指向 r8（8.12.0）；</li>
+<li>要求迁移 journal 末条 <code>idx === 14</code>。</li>
+</ul>
+<p>这意味着它对着一份<strong>上一版的包</strong>也会报全绿。AI 把 <code>--tar</code> 改为必填，迁移判据改成扫 <code>v1x-*.sh</code>、按包内实际迁移判断，不再写死版本号。</p>
+<p>为了证明新判据会变红，它做了一个夹具：删掉 0015 生成版。结果：</p>
+<blockquote>
+<p><strong>3 条 FAIL、exit 1</strong>——这道新判据被证明能变红（它正好抓住了 0015 当初的孤儿状态）。换回真目录后 10 PASS。</p>
+</blockquote>
+<p>这符合项目的一条固定做法：<strong>新校验先用夹具看它变红，否则“扫到 0 个对象也通过”就是假绿灯。</strong></p>
+<hr />
+<h3>3. 修完再上：五条提交</h3>
+<table>
+<thead>
+<tr>
+<th>提交</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>1e3079c</code></td>
+<td>识鱼功能（K3 视觉识别 + 预付费计费）、0015 生成版 + 直跑版 + snapshot、journal 16 条、14 条单测、handoff 泛化、<code>.env.example</code> 补变量</td>
+</tr>
+<tr>
+<td><code>b862338</code></td>
+<td>把 v15 部署脚本纳管进仓库，并给它一套能变红的夹具演练</td>
+</tr>
+<tr>
+<td><code>d52df46</code></td>
+<td>CHANGELOG 立 v8.13.0 一节，backlog 补 B-37…B-42</td>
+</tr>
+<tr>
+<td><code>b3d43f1</code></td>
+<td>修 <code>verify:static</code> 打印“全部通过”却 exit=127</td>
+</tr>
+<tr>
+<td><code>3a77ff8</code></td>
+<td>上线记录落笔，状态从“准备完成未上线”翻成“已上线 + 实测数字”</td>
+</tr>
+</tbody>
+</table>
+<p><code>1e3079c</code> 一次改了 24 个文件、+5474 行，但它是一个<strong>功能模块的完整落地</strong>（DB + API + 页面 + 测试 + 门禁），不是把多个功能打包。</p>
+<h4>3.1 计费状态机的 14 条测试</h4>
+<p>识鱼是预付费：免费次数用完才扣余额；余额不足不调模型；失败要退款/退次数；未授权时样本表零写入。这些路径都在 <code>api/services/fishId.test.ts</code> 里。</p>
+<p>AI 在测试文件头部明确写了<strong>没有覆盖什么</strong>：</p>
+<blockquote>
+<p>两条<strong>没有</strong>被覆盖的，写在这里而不是假装齐全：</p>
+<p>SQL 守卫文本（<code>&gt;= price</code>、<code>&lt; limit</code>、<code>GREATEST</code>）没测——那是 drizzle 私有结构，对它做字符串断言会在升级后悄悄退化成“匹配不到也算通过”；逐断言的变异验证没做——注入变异的操作被本机策略拦下，按规矩没换第二条通道重试。</p>
+</blockquote>
+<p>已拿到的红是“把桩的 read/write 写成属性时 13/14 全红”，证明测试确实在跑被测代码，但<strong>不等于每条都能变红</strong>。这两条登记为 B-39、B-40。</p>
+<h4>3.2 部署脚本不再犯 v14 的“坏仪表”</h4>
+<p>v14 的部署脚本用 POST 调 query，健康服务器上也会恒回 405，导致每次成功部署都显红。v15 改成：</p>
+<ul>
+<li>query 走批量 GET；</li>
+<li>mutation 用<strong>空入参</strong>拿 400，只验“路由在位”，不真的扣费、写样本或改授权；</li>
+<li>结构核对从 <code>CONCAT</code> 字面量改为 5 项逐条数值比较——不写自己在本机验证不了的字符串等式。</li>
+</ul>
+<hr />
+<h3>4. 上线实测</h3>
+<p>用户裁定：</p>
+<blockquote>
+<p><code>&quot;v8.13.0 已经备好，下一步执行到哪一步？&quot;=&quot;直接上线全流程&quot;</code></p>
+</blockquote>
+<p>2026-10-11 19:55 CST，<code>bash /root/v15-deploy.sh</code> exit 0，六道闸门全过。</p>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>实测</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>上传</td>
+<td>三份文件远端 sha 与本地逐字节一致；三个目标路径事先查过都不存在，没有覆盖任何唯一副本</td>
+</tr>
+<tr>
+<td>sha 对齐</td>
+<td><code>v14-resync-sha.sh</code> 写入 <code>f89ede3f…</code>，原脚本留 <code>.bak-before-sha-resync</code></td>
+</tr>
+<tr>
+<td>先跑 gates</td>
+<td>打印“现役 <code>7775cba9…</code> / 新包 <code>565c1f8a…</code>”；跑完再量，<code>boot.js</code> 仍是旧的——证明 gates 没碰任何东西</td>
+</tr>
+<tr>
+<td>备份</td>
+<td>全库 <code>quyu-before-v8.13.0-20261011-195540.sql.gz</code>（31 表 / 含 <code>Dump completed</code>）+ 旧 dist 自动归档</td>
+</tr>
+<tr>
+<td>迁移</td>
+<td>0015 两遍无错；结构核对五项数值全中</td>
+</tr>
+<tr>
+<td>复核</td>
+<td>首页 br 协商 504 B；<code>app.feed</code> / <code>posts.comments</code> 200；<code>app.fishId.balance</code> <strong>401</strong>（GET，不再是恒 405）；三个 mutation <strong>400</strong>（空入参被 zod 拦下，没有真的扣费）</td>
+</tr>
+<tr>
+<td>逐字节绑定</td>
+<td><code>verify:deploy --base … --tar …</code> <strong>10/10 PASS</strong>；线上入口 JS 与交付包一致；<code>FishId-a5iwSAvf.js</code> 200</td>
+</tr>
+</tbody>
+</table>
+<h4>4.1 一个自己抓出来的口径错误</h4>
+<p>部署脚本里索引数期望写成 3，实测是 <strong>5</strong>：<code>information_schema.STATISTICS</code> 把两张新表的 <code>PRIMARY</code> 也算进去了。断言当时写的是 <code>≥3</code>，所以没有误杀部署。</p>
+<p>AI 的处理是<strong>不悄悄改文档</strong>，而是在上线记录里写明“下一版应改成只数命名索引”。这条现在仍在 backlog。</p>
+<h4>4.2 31 表 vs 29 表</h4>
+<p>v14 上线前的备份是 29 表，v15 上线前是 31 表，而 v15 的备份是在跑 0015 <strong>之前</strong>取的。AI 没有放过这个差异：</p>
+<ul>
+<li>先查备份里 <code>fish_id_calls</code> / <code>fish_id_samples</code> 的计数，都是 0 → 0015 当时确实没应用；</li>
+<li>再把两份备份的建表名做差集：多的两张正是 v14 的 <code>comment_likes</code> / <code>post_favorites</code>。</li>
+</ul>
+<p>结论：31 = 29 + v14 的两张表，不是 0015 提前泄漏。这条调查过程写进了上线记录，而不是只写一个结论。</p>
+<hr />
+<h3>5. 部署解决不了的两件事</h3>
+<h4>5.1 识鱼“能点但不可用”</h4>
+<p>生产 <code>/opt/quyu/.env</code> 里<strong>没有 <code>MOONSHOT_API_KEY</code> 这一行</strong>，而悬浮球菜单无条件列出「识鱼」。结果是：每个用户点进去都拿 <code>PRECONDITION_FAILED</code>（412）“识别服务暂未开通”。</p>
+<p>降级是干净的——不崩、不扣钱、退次数——但用户看到的就是“这功能坏了”。AI 没有替用户决定“配 Key 还是收入口”，而是把它列为必须拍板的项。直到 10-19，这一项仍未解决。</p>
+<h4>5.2 准确率没有证据</h4>
+<p>AI 先前的任务清单里写过“534 张真图跑批量评测、产出 results.json”。它去实测：</p>
+<ul>
+<li>评测集是 <strong>315 张 / 17 目录</strong>，不是 534；</li>
+<li><code>scripts/eval-fishid.ts</code> <strong>只打印、从不落盘</strong>；</li>
+<li>本机连 <code>.env</code> 都没有，真实 API 跑不起来。</li>
+</ul>
+<blockquote>
+<p><strong>那句话不成立，我没有把它写进 CHANGELOG 当证据</strong>（登记 B-37）。</p>
+</blockquote>
+<p>所以本文不出现任何“识别准确率 xx%”的数字。仓库里能证明的只有：功能链路、计费守卫、降级行为；不能证明模型在真实鱼种上的准确率。</p>
+<h4>5.3 一个环境变量是摆设</h4>
+<p><code>FISH_ID_MIN_CONFIDENCE_X100</code> 在 <code>.env.example</code> 里看起来像个阈值开关，但唯一读它的 <code>isHighConfidence()</code> <strong>零调用点</strong>；真正决定界面文案的是另外两处硬编码 <code>0.55</code>。AI 在 <code>.env.example</code> 里照实写：“别把它当开关用”（B-38）。</p>
+<hr />
+<h3>6. 回滚</h3>
+<p>22:44，用户说“回滚未有识鱼的版本吧”。回滚到 8.12.0 后：</p>
+<ul>
+<li><code>boot.js</code> 回到 <code>7775cba9…</code>；</li>
+<li><code>verify:deploy</code> 10/10 PASS；</li>
+<li><code>fishId</code> 相关路径 404，<code>fishSpot</code> 401，无 5xx；</li>
+<li>0015 留在库里（全加法、带默认值，旧代码不读）。</li>
+</ul>
+<p>回滚原因不是识鱼本身，而是同批上线的悬浮球改动破坏了「哪钓」入口——完整过程见案例四。</p>
+<hr />
+<h3>7. 这段 Prompt 链说明了什么</h3>
+<ol>
+<li><strong>“上线最新版本”首先是一个定义问题</strong>。不先确认“哪一份、线上是什么、产物是不是同一份”，部署就是赌博。</li>
+<li><strong>门禁本身也会骗人</strong>。写死上一版的 <code>verify:handoff</code>、恒 405 的探针、把 <code>PRIMARY</code> 算进去的索引数——三个都是“看起来绿”的假信号。修法不是调低期望，而是先用夹具证明它会红。</li>
+<li><strong>AI 可以把功能写出来，但不能替产品宣布“可用”</strong>。Key 没配、准确率没测，这两条被明确留在完成声明之外。</li>
+</ol>
+<hr />
+<h3>8. 证据索引</h3>
+<table>
+<thead>
+<tr>
+<th>证据</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>用户输入与两次裁定</td>
+<td>JSONL 第 458、523–525、1421–1423 行</td>
+</tr>
+<tr>
+<td>六类阻断项审计</td>
+<td>会话 2026-10-11 18:58 起；<code>CHANGELOG.md</code> v8.13.0 节</td>
+</tr>
+<tr>
+<td>0015 配对与 journal 16</td>
+<td><code>db/migrations/0015_fish_id.sql</code>、<code>0015_fish_id_run.sql</code>、<code>meta/_journal.json</code></td>
+</tr>
+<tr>
+<td>14 条计费测试</td>
+<td><code>api/services/fishId.test.ts</code></td>
+</tr>
+<tr>
+<td>部署脚本与演练</td>
+<td><code>scripts/v15-deploy.sh</code>、<code>scripts/v15-deploy-drill.sh</code>、<code>npm run verify:v15-deploy</code></td>
+</tr>
+<tr>
+<td>上线实测</td>
+<td><code>CHANGELOG.md</code> v8.13.0「部署记录」</td>
+</tr>
+<tr>
+<td>无 Key / 无准确率 / 环境变量摆设</td>
+<td><code>.env.example</code> 第 32–48 行；<code>CHANGELOG.md</code> v8.13.0「明确未做」</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 class="chapter">案例四：B-45——一句“哪钓打不开”，两个假设，一次回滚</h1>
+<blockquote>
+<p><strong>会话</strong>：<code>f7ff7f6e-3311-4705-bcdd-d517dd7071c4</code>
+<strong>时间</strong>：2026-10-11 20:08 → 22:52（CST）
+<strong>对应提交</strong>：<code>62c2c06</code>（立案）、<code>411d5c0</code>（修复）、<code>f4eb3ff</code>（门禁补洞）、<code>5d6940a</code>（回滚）
+<strong>结果</strong>：修复包 r3 已就绪但<strong>未上线</strong>；生产回滚到 8.12.0</p>
+</blockquote>
+<hr />
+<h3>1. 报障：四个字</h3>
+<blockquote>
+<p><strong>Prompt 1</strong>（2026-10-11 20:08）</p>
+<p>哪钓怎么打不开了</p>
+</blockquote>
+<p>此前 13 分钟，v8.13.0 刚刚全量上线。用户是唯一真机用户，也是这版改动的签发者。</p>
+<p>AI 的第一反应不是改代码，而是分两条线取证：<strong>服务器真实行为</strong> + <strong>这次改动里可能碰到入口的代码</strong>。</p>
+<hr />
+<h3>2. 第一次误判：404 是探针的假象</h3>
+<p>AI 先用 curl 打 <code>/fish-spot</code>，得到 404。它没有立刻下结论，而是把老页面 <code>/me</code>、<code>/post/123</code> 一起打了一遍，发现也全是 404：</p>
+<blockquote>
+<p>我的探针没带 <code>Accept: text/html</code>，所以那一串 404 是<strong>探针的假象</strong>（<code>/me</code>、<code>/post/123</code> 这些老页面也一样 404）。用浏览器口径重测。</p>
+</blockquote>
+<p>补上 <code>Accept: text/html</code> 后，<code>/fish-spot</code>、<code>/fish-id</code> 都是 <strong>200 + 有 <code>#root</code></strong>。SPA fallback 正常，深链不是问题。</p>
+<p>这条值得单独写：<strong>故障现场的第一批数据可能是工具造成的</strong>。如果 AI 直接按 404 去查路由或 nginx，会浪费一整轮，甚至改错地方。</p>
+<h4>2.1 日志把范围缩到“那一下点击”</h4>
+<p>服务器日志里，19:55 之后有真实设备在正常浏览：</p>
+<ul>
+<li><code>auth.me</code>、<code>products.list</code>、<code>notify.unreadCount</code> 都成功；</li>
+<li><strong>没有一条 <code>app.fishSpot.*</code></strong>。</li>
+</ul>
+<p>说明请求根本没发到服务端。再看入口：除路由表外，全仓库只有悬浮球链到 <code>/fish-spot</code>。而 v15 恰好改了悬浮球——从“点一下直接进”改成“点一下弹菜单、再点一次才进”。</p>
+<p>范围锁定：<strong>客户端那一下点击</strong>。</p>
+<hr />
+<h3>3. 两个假设</h3>
+<h4>假设①：菜单弹在屏幕另一头（后来被证实）</h4>
+<p>v15 的菜单是 <code>position: fixed</code>，钉在<strong>视口右下</strong>（<code>right: 20px</code>、<code>bottom ≈ 148–172px</code>），<strong>不跟随球的位置</strong>。而球可以拖到左缘并吸附，位置还存在 <code>localStorage['qy-fishball-pos']</code>。</p>
+<p>AI 量出：菜单中心离球中心 <strong>186px</strong>。球贴在左边时，手指点下去，菜单弹在右下角，屏幕只是暗了一下——看起来就是“点了没反应”。</p>
+<p>这是<strong>代码里确定存在的缺陷</strong>，与用户现象同源。</p>
+<h4>假设②：同一次点击被刚渲染的遮罩接走（后来被证伪）</h4>
+<p>菜单在 <code>pointerup</code> 之后才渲染，浏览器随后按落点重新命中 <code>click</code>，可能直接落到遮罩上把菜单关掉。</p>
+<p>AI 明确标注这只是一个<strong>假设</strong>：</p>
+<blockquote>
+<p>我的复现是用合成指针事件做的（<code>pointerdown/pointerup/click</code> 显式打给球），它<strong>绕过了真实触摸的命中测试</strong>——而“同一次点击刚落点就被刚渲染出来的全屏遮罩接走、于是菜单瞬间被关掉”这类故障，恰恰只有真机触摸才会暴露。我想用浏览器真实点击复现，被策略拦下了，<strong>我没有绕过去</strong>。所以这句话是假设，不是结论。</p>
+</blockquote>
+<hr />
+<h3>4. 用户的第一个假设：APK 版本太低</h3>
+<blockquote>
+<p><strong>Prompt 2</strong>（2026-10-11 20:26）</p>
+<p>我好像知道原因了：我apk安装包版本太低</p>
+</blockquote>
+<p>AI 去解了两个联网版 APK 的壳：</p>
+<ul>
+<li>v10、v11 的 <code>capacitor.config.json</code> 都写着 <code>server.url = http://47.109.185.118:3000</code>、<code>cleartext: true</code> → <strong>界面来自服务器</strong>，装哪个壳都一样；</li>
+<li>更硬的证据：当天 20:18 有一台 Android 设备上报冷启动埋点，UA 是 <code>Mozilla/5.0 (Linux; Android 16; PLB110 …; wv)</code>；而壳里那份 9 月 6 日的兜底资源<strong>连哪钓都没有</strong>，跑不出这份埋点。</li>
+</ul>
+<p>结论：<strong>服务器可达时，APK 版本不影响哪钓进不进得去。</strong> 这个假设被证据排除。</p>
+<p>（顺带发现：壳里的兜底资源确实落后三个版本，断网时会掉回一个没有哪钓的旧界面。这是另一个真问题，后来通过重打 APK 修掉，但它治不了本次故障。）</p>
+<hr />
+<h3>5. 用户的截图：假设②被证伪</h3>
+<blockquote>
+<p><strong>Prompt 3</strong>（2026-10-11 22:17）</p>
+<p>附件引用：</p>
+<ul>
+<li><code>93de223a-….png</code></li>
+<li><code>1f6f4664-….png</code></li>
+</ul>
+</blockquote>
+<p>第一张图把旧写法与新写法放在同一屏，底部是真实点击日志：</p>
+<p><img src="assets/b45-menu-offset.png" alt="B-45 旧写法（球在左下、菜单钉在右侧）与新写法（菜单跟随球）的对照，底部为真实点击日志" /></p>
+<pre><code class="language-text">ballOld pointerdown
+ballOld pointerup moved=false
+旧: 菜单钉右下
+ballOld click 落到球
+</code></pre>
+<p><strong><code>click</code> 落到了球上，没有落到遮罩上。</strong> 假设②当场作废；旧写法的问题从头到尾只有一个——菜单钉在屏幕另一头。</p>
+<p>第二张图里两个菜单同时出现：</p>
+<p><img src="assets/b45-two-menus.png" alt="夹具中旧球与新球各自打开菜单、遮罩互不关闭——这是夹具缺陷，不是线上行为" /></p>
+<p>AI 注明这是<strong>夹具的缺陷</strong>（每颗球各开各的遮罩、互不关闭），不是线上行为。</p>
+<blockquote>
+<p><strong>AI 的回应</strong></p>
+<p>你自己点的这两张图比我做的任何推断都值钱——<strong>它证伪了我的假设②</strong>。也就是说 <code>click</code> 并没有落到刚渲染的遮罩上，菜单<strong>没有被自己关掉</strong>；旧写法的问题从头到尾只有一个——<strong>菜单钉在屏幕另一头</strong>（球在左下，菜单在右侧），所以你点下去“只看到屏幕暗了一下”。假设②到此作废。</p>
+</blockquote>
+<p>这一段是整份快照里“用户如何引导 AI 修 Bug”的最好例子：用户没有写代码，只提供了<strong>一张带日志的实拍</strong>，就推翻了一个 AI 无法在本地复现的假设。</p>
+<hr />
+<h3>6. 修复：把判定与定位变成纯函数</h3>
+<blockquote>
+<p><strong>Prompt 4</strong>（2026-10-11 21:43）</p>
+<p>修悬浮球</p>
+</blockquote>
+<p>AI 先做了一条自我约束：</p>
+<blockquote>
+<p>先证明机制，再改代码——我不想在没看到红的情况下上线一个“看起来对”的修复。</p>
+</blockquote>
+<p>它想用真实点击跑一个 <code>file://</code> 夹具，但点击通道在生产页和本地夹具上都被策略拦下两次。它没有换第三条通道：</p>
+<blockquote>
+<p>点击这条通道在本环境里被拦了两次（生产页、本地夹具都拦），<strong>我不绕，也不再找第三条</strong>。所以那个“同一次点击被遮罩接走”的假设，我<strong>不打算靠猜来修</strong>——改设计让它根本没有机会发生：点按直接进哪钓，路径里不出现遮罩。</p>
+</blockquote>
+<h4>6.1 设计</h4>
+<ul>
+<li><strong>点按 = 直接 <code>navigate('/fish-spot')</code></strong>，恢复 v14 的肌肉记忆；</li>
+<li><strong>长按 ≥450ms = 开功能菜单</strong>，菜单位置由球的实际 <code>rect</code> 推导，不再引用视口常量；</li>
+<li>位移 &gt;6px = 拖拽，既不跳转也不弹菜单；</li>
+<li>菜单基态可见，动画只负责入场过渡（以前 <code>opacity: 0</code> + <code>animation forwards</code>，系统抑制动画时就等于“看不见”）；</li>
+<li>遮罩关闭从 <code>click</code> 改绑 <code>pointerdown</code>，但<strong>不声称它修掉了假设②</strong>——只是让点按路径上根本没有遮罩。</li>
+</ul>
+<h4>6.2 12 条测试与负向对照</h4>
+<p><code>src/lib/fishballMenu.ts</code> 是纯函数，<code>src/lib/fishballMenu.test.ts</code> 有 12 条：</p>
+<ul>
+<li>没拖没长按 = <code>navigate</code>；</li>
+<li>差 1ms 没到阈值仍然是 <code>navigate</code>；</li>
+<li>位移超线 = <code>drag</code>；</li>
+<li>球贴左缘时菜单与球左缘对齐；</li>
+<li>球在顶部时菜单翻到下方；</li>
+<li>任何球位都钳在视口内；</li>
+<li><strong>负向对照</strong>：同一夹具喂给旧公式（<code>right:20 / bottom:160</code>），断言它离球 <strong>&gt;150px</strong>（实测 278px）；新公式 <strong>&lt;120px</strong>（103.9px）；两者结果必须不同。</li>
+</ul>
+<p>负向对照是关键：如果只断言“新公式等于某个期望值”，测试可能只是把实现抄了一遍；把旧实现喂进去必须变红，才能证明这道判据真的在防 B-45。</p>
+<h4>6.3 用户的第二次实测：“有动效无跳转”</h4>
+<blockquote>
+<p><strong>Prompt 5</strong>（2026-10-11 21:51）</p>
+<p>悬浮窗有动效无跳转</p>
+</blockquote>
+<p>AI 没有辩解，直接承认组件还没接完：</p>
+<blockquote>
+<p><code>fishballMenu.ts</code> + 12 条测试已就位并通过，但 <strong><code>FloatingBall.tsx</code> 我还没改</strong>，所以线上仍是坏的那一版。继续把组件接上。</p>
+</blockquote>
+<p>随后把手势判定接进组件。这里也有一条“AI 不能只说做了纯函数就宣布修好”的教训。</p>
+<hr />
+<h3>7. 从 r2 到 r3：门禁也会假绿</h3>
+<p>修复包 r2 构建后，AI 发现 193 处不同、95 个分块改名——不是注释能造成的量级。它没有把 r2 推上线，而是追查构建链，重出 r3。</p>
+<p>更严重的是另一次：</p>
+<blockquote>
+<p>重出热修包时我把 esbuild 的 <code>--banner:js</code> 漏了，<code>boot.js</code> 里 65 处 <code>require(</code> 在 ESM 下必 <code>ReferenceError</code>，服务根本起不来；而当时的 <code>verify:handoff</code> 是 0 失败。</p>
+<p>原因很结构性：整树比对是“包 vs 本机 dist”，两边出自同一次错构建就一起绿——它只能证明“包等于我本机这份”，不能证明“这份能跑”。</p>
+</blockquote>
+<p><code>f4eb3ff</code> 补了一条判据：包内 <code>boot.js</code> 首行必须以 <code>import { createRequire } from 'module'</code> 开头。它先在<strong>真实坏包</strong>上跑出了红：</p>
+<pre><code class="language-text">FAIL ... 首行=&quot;var __create = Object.create;&quot;
+PASS ... 交付包与本机构建逐文件一致
+</code></pre>
+<p>这两行同屏，就是“逐文件一致”不足以证明可运行的最好证据。</p>
+<hr />
+<h3>8. 回滚</h3>
+<blockquote>
+<p><strong>Prompt 6</strong>（2026-10-11 22:42）</p>
+<p>回滚未有识鱼的版本吧</p>
+</blockquote>
+<p>AI 先重新量了一遍现状，而不是拿一小时前的记忆当现状：</p>
+<ul>
+<li>现役 8.13.0：<code>565c1f8a…</code> / <code>index-MZH_DVpL.js</code>；</li>
+<li>回滚目标 8.12.0：<code>7775cba9…</code> / <code>index-HdRk0PXS.js</code>，44 个 <code>.br</code>，<strong>壳里 0 个 fishid 分块</strong>——确实是没有识鱼的那版。</li>
+</ul>
+<p>执行回滚 + 重启后，从外面验穿：</p>
+<ul>
+<li><code>boot.js</code> 回到 <code>7775cba9…</code>；</li>
+<li><code>verify:deploy</code> 10/10 PASS；</li>
+<li>首页、<code>app.feed</code>、<code>posts.comments</code> 正常；</li>
+<li><code>fishId</code> 相关 404，<code>fishSpot</code> 401，无 5xx；</li>
+<li>悬浮球回到 v14 的“点一下直接进”。</li>
+</ul>
+<p>0015 留在库里，旧代码不读它。</p>
+<blockquote>
+<p><strong>为什么回滚而不是继续修</strong>：修复本身已经写好（<code>411d5c0</code>），但热修包 r3 尚未切换，而线上入口坏着的时间已经 3 小时。用户选择先回到可用版本，把修复留到下一次有验证窗口时再上。今天生产仍是 8.12.0，r3 在服务器上待命。</p>
+</blockquote>
+<hr />
+<h3>9. 这段事故留下了什么</h3>
+<ol>
+<li><strong>B-45 立案时就把排除项写进去</strong>：不是 APK、不是分块、不是深链、不是服务端。下一轮不必重查。</li>
+<li><strong>两个假设要分开记</strong>：①被证实，②被用户截图证伪。文档里不能把②写成“已修复”。</li>
+<li><strong>负向对照</strong>：12 条测试里有 3 条是为了让旧实现变红，而不是为了给新实现盖章。</li>
+<li><strong>门禁要能证明“可运行”</strong>：逐文件一致只能证明“两份一样”，不能证明“这份能启动”；<code>createRequire</code> 判据补上了这个洞。</li>
+<li><strong>回滚也是一条要演练的路径</strong>：回滚包布局、包内 <code>boot.js</code> 哈希、回滚后探针，都在切换前验过。</li>
+</ol>
+<hr />
+<h3>10. 证据索引</h3>
+<table>
+<thead>
+<tr>
+<th>证据</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>报障原文</td>
+<td>JSONL 第 1640 行</td>
+</tr>
+<tr>
+<td>404 假象与 SPA 复测</td>
+<td>会话 2026-10-11 20:11–20:14</td>
+</tr>
+<tr>
+<td>日志无 <code>app.fishSpot.*</code></td>
+<td>同上；<code>journalctl -u quyu --since 19:50</code></td>
+</tr>
+<tr>
+<td>APK <code>server.url</code> 与 UA 证据</td>
+<td>会话 2026-10-11 20:26–20:31</td>
+</tr>
+<tr>
+<td>用户截图与假设②证伪</td>
+<td><code>assets/b45-menu-offset.png</code>、<code>assets/b45-two-menus.png</code>；JSONL 第 2261 行</td>
+</tr>
+<tr>
+<td>纯函数与 12 条测试</td>
+<td><code>src/lib/fishballMenu.ts</code>、<code>src/lib/fishballMenu.test.ts</code>；提交 <code>411d5c0</code></td>
+</tr>
+<tr>
+<td><code>createRequire</code> 门禁</td>
+<td>提交 <code>f4eb3ff</code>；<code>scripts/verify-handoff.mjs</code></td>
+</tr>
+<tr>
+<td>回滚</td>
+<td>提交 <code>5d6940a</code>；<code>CHANGELOG.md</code> v8.13.0「回滚」</td>
+</tr>
+<tr>
+<td>当前生产</td>
+<td>8.12.0，<code>7775cba9…</code>；r3 未上线</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 class="chapter">附录：证据清单与复现方式</h1>
+<h3>A. 原始会话</h3>
+<table>
+<thead>
+<tr>
+<th>会话</th>
+<th>覆盖内容</th>
+<th>SHA256</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>78f64457…</code></td>
+<td>案例一、二（v14 帖子交互、图片链路）</td>
+<td><code>6095da24…b3b89</code></td>
+</tr>
+<tr>
+<td><code>f7ff7f6e…</code></td>
+<td>案例三、四（v15 识鱼、B-45 事故）</td>
+<td><code>894a392d…4f7e1</code></td>
+</tr>
+</tbody>
+</table>
+<h3>B. 核心提交</h3>
+<table>
+<thead>
+<tr>
+<th>提交</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>a8be879</code></td>
+<td>v14 DB：评论点赞、收藏、评论新列</td>
+</tr>
+<tr>
+<td><code>ef184cb</code></td>
+<td>v14 API：图片落盘、feed 瘦身、评论/收藏、机审接线</td>
+</tr>
+<tr>
+<td><code>a3b9ea7</code></td>
+<td>v14 前端：PostSheet、删 CommentSheet、整卡可点</td>
+</tr>
+<tr>
+<td><code>e938d7a</code></td>
+<td>交付前双轴审查修 6 项行为缺陷</td>
+</tr>
+<tr>
+<td><code>f1795ba</code></td>
+<td>机审按官方文档返工（base64 通道不存在）</td>
+</tr>
+<tr>
+<td><code>68b4aed</code> / <code>7d3fb54</code></td>
+<td>B-24 立案与撤回</td>
+</tr>
+<tr>
+<td><code>1e3079c</code></td>
+<td>v15 识鱼功能 + 0015 迁移配对 + 门禁泛化</td>
+</tr>
+<tr>
+<td><code>b862338</code></td>
+<td>v15 部署脚本纳管 + 夹具演练</td>
+</tr>
+<tr>
+<td><code>b3d43f1</code></td>
+<td><code>verify:static</code> exit=127 修复</td>
+</tr>
+<tr>
+<td><code>62c2c06</code></td>
+<td>B-45 立案（含排除项）</td>
+</tr>
+<tr>
+<td><code>411d5c0</code></td>
+<td>B-45 修复：点按直进、长按菜单跟随球</td>
+</tr>
+<tr>
+<td><code>f4eb3ff</code></td>
+<td>门禁补 <code>createRequire</code> 判据</td>
+</tr>
+<tr>
+<td><code>5d6940a</code></td>
+<td>回滚到 v8.12.0</td>
+</tr>
+</tbody>
+</table>
+<h3>C. 可复跑的命令</h3>
+<pre><code class="language-bash">npm ci
+npm run check        # tsc -b
+npm test             # 5 文件 / 49 用例
+npm run check:docs   # 文档指针全解析
+npm run build        # 含单测、SQL、动画边界、预压缩等门禁
+</code></pre>
+<p>与生产相关的只读复核（需要网络与交付包）：</p>
+<pre><code class="language-bash">npm run verify:handoff -- --tar &lt;dist.tar.gz&gt;
+npm run verify:deploy  -- --base &lt;url&gt; --tar &lt;dist.tar.gz&gt;
+</code></pre>
+<h3>D. 未验证事项（不得当作已完成）</h3>
+<ol>
+<li>识鱼生产不可用：未配置 <code>MOONSHOT_API_KEY</code>，点击返回 412。</li>
+<li>识鱼准确率无证据：评测脚本只打印不落盘，真实 API 未跑。</li>
+<li>图片机审未开启：<code>IMAGE_MODERATION_ENABLED=false</code>，未打真实网关，fail-open/fail-closed 未拍板。</li>
+<li>三条真机 UI 行为无记录：举报弹层重开、关注乐观态、退出登录清空。</li>
+<li>存量 base64 回填未执行：生产预检仅 1 行/0.93MB，工具就绪但无 <code>--apply</code> 记录。</li>
+<li>B-45 修复包 r3 未上线：生产仍是 8.12.0。</li>
+<li>首条 Git 提交是 v8.1.0 基线（253 文件），已在 <code>docs/competition/README.md</code> §2.2 披露。</li>
+</ol>
+
+</body></html>

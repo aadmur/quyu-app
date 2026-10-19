@@ -1,0 +1,17 @@
+# 趣渔比赛材料 SHA256 清单
+# 生成：2026-10-19；校验：在本目录执行 `sha256sum -c manifest.sha256`
+# 说明：路径均相对 docs/competition/。
+a787de5e55d1a38c05ab43d9c395c45e04940ba4ff6c074fbea4427afa0080dd  README.md
+6b3a33307451c7e6c3644f13984864f56ceebb3868360297d8931ddd380cdf75  RELEASE-CHECKLIST.md
+56197be8b0e6463aed59e4115568f899ebfcc22846df25d1083a7e4c36d00cad  01-v14-post-interaction.md
+9c25304d30c6f733c42beedffeb06f16297c1e0f2c79b9e0e5fd245a97e3682d  02-v14-image-pipeline.md
+3f10507e4ea2879671f8a828dfcd482ad5e52e3c5d5531afc4eec3de7e644611  03-v15-fish-id.md
+27f6a4c8a9a5d7c588c750847884d5a500c2903171470332bda4872f58cee033  04-b45-fishball-incident.md
+95f9fb0b2691817931d2ea3735d0dbc45b46fe1ac41b82458774ce5c4a311e33  AI-PROMPT-HISTORY.md
+1fc4614a7faa2fc4328f1d91304232c92c3bd31062e66466aa8b9763a96578dc  AI-PROMPT-HISTORY.html
+14e63b9fbe60aa5dc45524c8c1fbabbee29eddc4887470809f8aaa81b38bb19c  AI-PROMPT-HISTORY.pdf
+a299b942362186d6e801a2e4c765f1b0993bcbe08fcfa2b29d8523ec944a0bdd  assets/b45-menu-offset.png
+deb92de5df4722bc35599756c451f799d17985c728a5b3afbc78f85354a6a1b0  assets/b45-two-menus.png
+# 原始会话日志（不随仓库分发；路径为开发机 Qoder 目录，仅供本地复核）
+# sha256=6095da2415e45d37f24d66c0ccd404d23a583fe70055728330aca511256b3b89 bytes=12600829 path=C:/Users/Administrator/.qoder-cn/projects/E------APP--/78f64457-e692-48e2-b8f0-75054467d555.jsonl
+# sha256=894a392d3638351d55c1563542b1bad1d6f2d074fedcb63e472a119fcd94f7e1 bytes=4335643 path=C:/Users/Administrator/.qoder-cn/projects/E------APP--/f7ff7f6e-3311-4705-bcdd-d517dd7071c4.jsonl
