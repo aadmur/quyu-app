@@ -1,8 +1,8 @@
 # 趣渔比赛材料 SHA256 清单
 # 生成：2026-10-19；校验：在本目录执行 `sha256sum -c manifest.sha256`
 # 说明：路径均相对 docs/competition/。
-a787de5e55d1a38c05ab43d9c395c45e04940ba4ff6c074fbea4427afa0080dd  README.md
-df2c7e0d9c18ca4c242e8751d0917d16bded32a179552b5e7826e5d1ac236c78  RELEASE-CHECKLIST.md
+e3b338eb49fe731934955db499821dfd2c28e78535d60bda8abea4b729db00ea  README.md
+d68b8d4c9a1daccfe858dfbd19fe976074b597a9bc1fab5f51af0157f08435d6  RELEASE-CHECKLIST.md
 56197be8b0e6463aed59e4115568f899ebfcc22846df25d1083a7e4c36d00cad  01-v14-post-interaction.md
 9c25304d30c6f733c42beedffeb06f16297c1e0f2c79b9e0e5fd245a97e3682d  02-v14-image-pipeline.md
 3f10507e4ea2879671f8a828dfcd482ad5e52e3c5d5531afc4eec3de7e644611  03-v15-fish-id.md
