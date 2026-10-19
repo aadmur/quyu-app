@@ -4,7 +4,7 @@
 
 > 现状（2026-10-19 编写时）
 >
-> - 本地分支：`v14-post-interaction`，105 条提交（完成本文档提交后为 107）。
+> - 本地分支：`v14-post-interaction`，105 条功能提交 + 3 条比赛文档提交 = 108 条。
 > - 远端：`https://github.com/aadmur/quyu-app.git`，**私有**。
 > - `origin/main`：`1d9054d42326f86cde73535a0a0045cdf0729af2`，46 条提交，与本地历史**无共同祖先**（`git merge-base` 为空）。这是另一套按批次打包的历史，不是本项目的权威演进记录。
 > - 因此必须用 `--force-with-lease` 覆盖 `main`，然后二选一：把仓库设为 Public，或给评审账号 Read 权限。
@@ -42,7 +42,7 @@ git bundle verify E:/backup/quyu-competition/local-all-refs.bundle
 ## 1. 发布前门禁
 
 ```bash
-git rev-list --count HEAD          # 预期 107
+git rev-list --count HEAD          # 预期 108
 git log --oneline --reverse | head -3
 git log --oneline -5
 ```
@@ -146,7 +146,7 @@ git -C "$tmp/quyu" log --oneline -3
 rm -rf "$tmp"
 ```
 
-克隆后的提交数应为 107，最近三条应包含 `docs(competition)` 与 `docs(readme)`。随后在浏览器无痕窗口打开仓库首页，确认：
+克隆后的提交数应为 108，最近几条应包含 `docs(competition)`、`docs(readme)` 与本次修正。随后在浏览器无痕窗口打开仓库首页，确认：
 
 - README 正常渲染，首屏能看到“趣渔”和比赛材料入口；
 - `docs/competition/AI-PROMPT-HISTORY.pdf` 可直接下载并打开；

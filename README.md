@@ -10,7 +10,7 @@
 |---|---|
 | 前端 | React 19、Vite 7、react-router 7、TanStack Query 5、Tailwind 3、framer-motion（LazyMotion） |
 | API | Hono 4、tRPC 11、Zod、jose（JWT） |
-| 数据 | MySQL 8、Drizzle ORM、SQL 迁移（`db/migrations`，0001–0015） |
+| 数据 | MySQL 8、Drizzle ORM、SQL 迁移（`db/migrations`，0000–0015） |
 | 端 | Capacitor 7 WebView 壳加载远端 `server.url` |
 | 质量 | TypeScript 5.9、Vitest 4、ESLint 9、自建脚本门禁 |
 
